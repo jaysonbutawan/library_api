@@ -34,10 +34,9 @@ class BorrowTransactionController extends Controller
             return response()->json(['message' => 'No available copies'], 400);
         }
 
-        // Wrap in DB transaction for consistency
         $transaction = DB::transaction(function () use ($member, $book) {
             $borrowDate = Carbon::today();
-            $dueDate = $borrowDate->copy()->addDays(7); // 7-day borrow period
+            $dueDate = $borrowDate->copy()->addDays(7); 
 
             $transaction = BorrowTransaction::create([
                 'library_member_id' => $member->library_member_id,
@@ -47,7 +46,6 @@ class BorrowTransactionController extends Controller
                 'status' => 'borrowed'
             ]);
 
-            // Reduce available copies
             $book->decrement('available_copies');
 
             return $transaction;
@@ -82,7 +80,7 @@ class BorrowTransactionController extends Controller
 
         if ($today->gt(Carbon::parse($transaction->due_date))) {
             $daysLate = $today->diffInDays(Carbon::parse($transaction->due_date));
-            $fine = $daysLate * 5; // Example: 5 currency units per day
+            $fine = $daysLate * 5;
         }
 
         DB::transaction(function () use ($transaction, $today, $fine) {

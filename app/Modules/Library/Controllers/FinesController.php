@@ -67,18 +67,18 @@ class FinesController extends Controller
     {
         $fines = Fine::whereHas('transaction', function ($q) use ($memberId) {
             $q->where('library_member_id', $memberId);
-        })->with(['transaction.member.student'])->get(); // eager load student
+        })->with('transaction.member')->get(); // eager load member
 
-        // Format response with student name and department
         $result = $fines->map(function ($fine) {
-            $student = $fine->transaction->member->student ?? null;
+            $member = $fine->transaction->member;
             return [
                 'fine_id' => $fine->fine_id,
                 'amount' => $fine->amount,
                 'paid_status' => $fine->paid_status,
                 'transaction_id' => $fine->transaction_id,
-                'student_name' => $student->full_name ?? null,
-                'student_department' => $student->department->name ?? null,
+                'student_name' => $member->full_name ?? null,
+                'student_department' => $member->department ?? null,
+                'student_email' => $member->email ?? null,
             ];
         });
 
@@ -88,21 +88,22 @@ class FinesController extends Controller
     /**
      * Get unpaid fines for cashier
      */
-   public function unpaidFines()
-{
-    $fines = Fine::where('paid_status', 'unpaid')->with(['transaction.member.student'])->get();
+    public function unpaidFines()
+    {
+        $fines = Fine::where('paid_status', 'unpaid')->with('transaction.member')->get();
 
-    $result = $fines->map(function($fine) {
-        $student = $fine->transaction->member->student ?? null;
-        return [
-            'fine_id' => $fine->fine_id,
-            'amount' => $fine->amount,
-            'transaction_id' => $fine->transaction_id,
-            'student_name' => $student->full_name ?? null,
-            'student_department' => $student->department->name ?? null,
-        ];
-    });
+        $result = $fines->map(function ($fine) {
+            $member = $fine->transaction->member;
+            return [
+                'fine_id' => $fine->fine_id,
+                'amount' => $fine->amount,
+                'transaction_id' => $fine->transaction_id,
+                'student_name' => $member->full_name ?? null,
+                'student_department' => $member->department ?? null,
+                'student_email' => $member->email ?? null,
+            ];
+        });
 
-    return response()->json($result);
-}
+        return response()->json($result);
+    }
 }
