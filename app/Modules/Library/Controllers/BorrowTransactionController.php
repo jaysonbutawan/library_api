@@ -3,40 +3,39 @@
 namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Modules\Library\Models\BorrowTransaction;
 use App\Modules\Library\Models\Book;
 use App\Modules\Library\Models\LibraryMember;
-use Carbon\Carbon;
+use App\Modules\Library\Requests\BorrowBookRequest;
 use Illuminate\Support\Facades\DB;
+
 
 class BorrowTransactionController extends Controller
 {
-    /**
-     * Borrow a book
-     */
-    public function borrow(Request $request)
+    //Borrow a book
+    public function borrow(BorrowBookRequest $request)
     {
-        $validated = $request->validate([
-            'library_member_id' => 'required|exists:library_members,library_member_id',
-            'book_id' => 'required|exists:books,book_id'
-        ]);
+        $validated = $request->validated();
 
-        $member = LibraryMember::find($validated['library_member_id']);
+        $member = LibraryMember::findOrFail($validated['library_member_id']);
+        $book = Book::findOrFail($validated['book_id']);
 
         if ($member->membership_status !== 'active') {
-            return response()->json(['message' => 'Membership is blocked'], 403);
+            return response()->json([
+                'message' => 'Membership is blocked.'
+            ], 403);
         }
 
-        $book = Book::find($validated['book_id']);
-
         if ($book->available_copies <= 0) {
-            return response()->json(['message' => 'No available copies'], 400);
+            return response()->json([
+                'message' => 'No available copies.'
+            ], 400);
         }
 
         $transaction = DB::transaction(function () use ($member, $book) {
-            $borrowDate = Carbon::today();
-            $dueDate = $borrowDate->copy()->addDays(7); 
+
+            $borrowDate = now();
+            $dueDate = now()->addDays(7);
 
             $transaction = BorrowTransaction::create([
                 'library_member_id' => $member->library_member_id,
@@ -52,34 +51,28 @@ class BorrowTransactionController extends Controller
         });
 
         return response()->json([
-            'message' => 'Book borrowed successfully',
-            'data' => [
-                'transaction_id' => $transaction->transaction_id,
-                'book' => $book,
-                'student_name' => $member->full_name,
-                'student_department' => $member->department,
-                'borrow_date' => $transaction->borrow_date,
-                'due_date' => $transaction->due_date,
-            ]
+            'message' => 'Book borrowed successfully.',
+            'data' => $transaction
         ], 201);
     }
 
-    /**
-     * Return a book
-     */
-    public function return(Request $request, $transactionId)
+    // Return a book
+    public function return($transactionId)
     {
-        $transaction = BorrowTransaction::with(['book', 'member'])->find($transactionId);
+        $transaction = BorrowTransaction::with(['book', 'member'])
+            ->find($transactionId);
 
         if (!$transaction || $transaction->status !== 'borrowed') {
-            return response()->json(['message' => 'Transaction not found or already returned'], 404);
+            return response()->json([
+                'message' => 'Transaction not found or already returned.'
+            ], 404);
         }
 
-        $today = Carbon::today();
+        $today = now();
         $fine = 0;
 
-        if ($today->gt(Carbon::parse($transaction->due_date))) {
-            $daysLate = $today->diffInDays(Carbon::parse($transaction->due_date));
+        if ($today->gt($transaction->due_date)) {
+            $daysLate = $today->diffInDays($transaction->due_date);
             $fine = $daysLate * 5;
         }
 
@@ -87,15 +80,14 @@ class BorrowTransactionController extends Controller
             $transaction->update([
                 'return_date' => $today,
                 'status' => 'returned',
-                'fine_amount' => $fine
+                'fine_amount' => $fine,
             ]);
 
-            // Increase book available copies
             $transaction->book->increment('available_copies');
         });
 
         return response()->json([
-            'message' => 'Book returned successfully',
+            'message' => 'Book returned successfully.',
             'fine_amount' => $fine,
             'data' => [
                 'transaction_id' => $transaction->transaction_id,
@@ -105,14 +97,12 @@ class BorrowTransactionController extends Controller
                 'borrow_date' => $transaction->borrow_date,
                 'due_date' => $transaction->due_date,
                 'return_date' => $transaction->return_date,
-                'status' => $transaction->status
+                'status' => $transaction->status,
             ]
         ]);
     }
 
-    /**
-     * Get all borrow transactions for a member
-     */
+    //Get all borrow transactions for a member
     public function memberTransactions($memberId)
     {
         $transactions = BorrowTransaction::with(['book', 'member'])

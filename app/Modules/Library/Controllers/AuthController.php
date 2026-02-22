@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Modules\Library\Models\LibraryMember;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -14,8 +15,8 @@ class AuthController extends Controller
 
     public function __construct()
     {
-        $this->admissionApiUrl = config('services.admission.url'); // e.g., https://admission.example.com
-        $this->admissionApiToken = config('services.admission.token'); // optional API token
+        $this->admissionApiUrl = config('services.admission.url'); 
+        $this->admissionApiToken = config('services.admission.token');
     }
 
     /**
@@ -28,7 +29,6 @@ class AuthController extends Controller
             'password' => 'required|string'
         ]);
 
-        // Validate student credentials via Admission API
         $response = Http::withToken($this->admissionApiToken)
             ->post("{$this->admissionApiUrl}/api/admission/login", [
                 'email' => $request->email,
@@ -43,7 +43,6 @@ class AuthController extends Controller
 
         $studentData = $response->json();
 
-        // Store or update student info locally
         $member = LibraryMember::updateOrCreate(
             ['student_id' => $studentData['student_id']],
             [
@@ -84,7 +83,6 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // Optionally refresh from Admission API
         $studentData = null;
         try {
             $response = Http::withToken($this->admissionApiToken)
@@ -93,9 +91,9 @@ class AuthController extends Controller
             if ($response->successful()) {
                 $studentData = $response->json();
             }
-        } catch (\Exception $e) {
-            // Fallback: use locally stored info
-        }
+        } catch (\Exception $e) {    
+                Log::error('Failed to fetch student data from Admission API: ' . $e->getMessage());
+            }
 
         return response()->json([
             'student' => [

@@ -3,63 +3,96 @@
 namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Modules\Library\Models\Fine;
-use App\Modules\Library\Models\BorrowTransaction;
+use App\Modules\Library\Requests\PayFineRequest;
+use App\Modules\Library\Requests\StudentFinesRequest;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FinesController extends Controller
 {
-    /**
-     * Create a fine for a borrow transaction
-     */
-    public function create(Request $request)
+    public function studentFines(StudentFinesRequest $request, $studentId)
     {
-        $validated = $request->validate([
-            'transaction_id' => 'required|exists:borrow_transactions,transaction_id',
-            'amount' => 'required|numeric|min:0'
-        ]);
+        $includePaid = $request->query('include_paid', 1);
 
-        $fine = Fine::create([
-            'transaction_id' => $validated['transaction_id'],
-            'amount' => $validated['amount'],
-            'paid_status' => 'unpaid'
+        $query = Fine::whereHas('transaction', fn($q) => $q->where('library_member_id', $studentId))
+            ->with(['transaction.book']);
+
+        if (!$includePaid) {
+            $query->where('paid_status', 'unpaid');
+        }
+
+        $fines = $query->get()->map(fn($fine) => [
+            'fine_id' => $fine->fine_id,
+            'book_title' => $fine->transaction->book->title,
+            'amount' => $fine->amount,
+            'status' => $fine->paid_status
         ]);
 
         return response()->json([
-            'message' => 'Fine created successfully',
-            'data' => $fine
-        ], 201);
+            'student_id' => $studentId,
+            'fines' => $fines
+        ]);
     }
 
-    /**
-     * Pay a fine
-     */
-    public function pay(Request $request, $fineId)
+    public function finesChoice(Request $request)
     {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0'
+        $query = Fine::with(['transaction.member', 'transaction.book']);
+        if ($request->has('student_id')) {
+            $studentId = $request->query('student_id');
+            $query->whereHas('transaction', fn($q) => $q->where('library_member_id', $studentId));
+        }
+        if ($request->has('department')) {
+            $department = $request->query('department');
+            $query->whereHas('transaction.member', fn($q) => $q->where('department', $department));
+        }
+
+        $fines = $query->get()->map(fn($fine) => [
+            'fine_id' => $fine->fine_id,
+            'book_title' => $fine->transaction->book->title,
+            'student_id' => $fine->transaction->member->student_id,
+            'student_name' => $fine->transaction->member->full_name,
+            'department' => $fine->transaction->member->department,
+            'amount' => $fine->amount,
+            'status' => $fine->paid_status,
         ]);
 
+        return response()->json([
+            'data' => $fines,
+            'count' => $fines->count()
+        ]);
+    }
+
+    public function payFine(PayFineRequest $request, $fineId)
+    {
         $fine = Fine::find($fineId);
+
         if (!$fine) {
-            return response()->json(['message' => 'Fine not found'], 404);
+            return response()->json([
+                'message' => 'Fine not found'
+            ], 404);
         }
 
-        // Optional: Check that amount matches fine
+        $validated = $request->validated();
         if ($validated['amount'] < $fine->amount) {
-            return response()->json(['message' => 'Amount is less than fine'], 400);
+            return response()->json([
+                'message' => 'Payment amount is less than fine'
+            ], 400);
         }
 
-        $fine->update([
-            'paid_status' => 'paid'
-        ]);
+        DB::transaction(function () use ($fine) {
+            $fine->update(['paid_status' => 'paid']);
+        });
 
         return response()->json([
             'message' => 'Fine payment successful',
-            'data' => $fine
+            'data' => [
+                'fine_id' => $fine->fine_id,
+                'amount' => $fine->amount,
+                'status' => $fine->paid_status
+            ]
         ]);
     }
-
     /**
      * Get all fines for a library member
      */
@@ -67,7 +100,7 @@ class FinesController extends Controller
     {
         $fines = Fine::whereHas('transaction', function ($q) use ($memberId) {
             $q->where('library_member_id', $memberId);
-        })->with('transaction.member')->get(); // eager load member
+        })->with('transaction.member')->get(); 
 
         $result = $fines->map(function ($fine) {
             $member = $fine->transaction->member;
