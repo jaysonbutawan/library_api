@@ -3,106 +3,50 @@
 namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Library\Requests\LoginRequest;
+use App\Modules\Library\Services\LibraryAuthService;
 use Illuminate\Http\Request;
-use App\Modules\Library\Models\LibraryMember;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
-    protected $admissionApiUrl;
-    protected $admissionApiToken;
+    protected LibraryAuthService $authService;
 
-    public function __construct()
+    public function __construct(LibraryAuthService $authService)
     {
-        $this->admissionApiUrl = config('services.admission.url'); 
-        $this->admissionApiToken = config('services.admission.token');
+        $this->authService = $authService;
     }
 
-    /**
-     * Library login (auto-registers member if first login)
-     */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string'
-        ]);
+        $result = $this->authService->login($request->validated());
 
-        $response = Http::withToken($this->admissionApiToken)
-            ->post("{$this->admissionApiUrl}/api/admission/login", [
-                'email' => $request->email,
-                'password' => $request->password
-            ]);
-
-        if (!$response->successful()) {
-            return response()->json([
-                'message' => 'Invalid credentials.'
-            ], 401);
+        if (!$result['success']) {
+            return response()->json(['message' => $result['message']], 401);
         }
-
-        $studentData = $response->json();
-
-        $member = LibraryMember::updateOrCreate(
-            ['student_id' => $studentData['student_id']],
-            [
-                'membership_status' => 'active',
-                'registered_at' => now(),
-                'full_name' => $studentData['full_name'],
-                'department' => $studentData['department'],
-                'email' => $studentData['email'],
-            ]
-        );
-
-        // Create local library token
-        $token = $member->createToken('library-token')->plainTextToken;
 
         return response()->json([
             'message' => 'Login successful.',
-            'token' => $token,
+            'token' => $result['token'],
             'student' => [
-                'id' => $member->student_id,
-                'name' => $member->full_name,
-                'department' => $member->department,
-                'email' => $member->email,
-                'membership_status' => $member->membership_status
+                'id' => $result['member']->student_id,
+                'name' => $result['member']->full_name,
+                'department' => $result['member']->department,
+                'email' => $result['member']->email,
+                'membership_status' => $result['member']->membership_status
             ]
         ]);
     }
 
-    /**
-     * Get logged-in student info (protected route)
-     */
     public function profile(Request $request)
     {
         $member = $request->user();
 
         if (!$member) {
-            return response()->json([
-                'message' => 'Library member not found'
-            ], 404);
+            return response()->json(['message' => 'Library member not found'], 404);
         }
 
-        $studentData = null;
-        try {
-            $response = Http::withToken($this->admissionApiToken)
-                ->get("{$this->admissionApiUrl}/api/students/{$member->student_id}");
-
-            if ($response->successful()) {
-                $studentData = $response->json();
-            }
-        } catch (\Exception $e) {    
-                Log::error('Failed to fetch student data from Admission API: ' . $e->getMessage());
-            }
-
         return response()->json([
-            'student' => [
-                'id' => $member->student_id,
-                'name' => $studentData['full_name'] ?? $member->full_name,
-                'department' => $studentData['department'] ?? $member->department,
-                'email' => $studentData['email'] ?? $member->email,
-                'membership_status' => $member->membership_status
-            ]
+            'student' => $this->authService->profile($member)
         ]);
     }
 }
