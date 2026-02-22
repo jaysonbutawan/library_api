@@ -11,10 +11,11 @@ return new class extends Migration
         Schema::create('books', function (Blueprint $table) {
             $table->id('book_id'); 
             $table->string('isbn', 20)->unique()->nullable();
-            $table->string('title');
+            $table->string('title', 255);
             $table->string('author')->nullable();
+            $table->string('status', 50)->default('available');
             $table->string('category', 100)->nullable();
-            $table->integer('total_copies')->default(1);
+            $table->integer('total_copies', 255)->default(1);
             $table->integer('available_copies')->default(1);
 
             $table->timestamp('created_at')->useCurrent();

@@ -14,9 +14,9 @@ return new class extends Migration
 
             $table->unsignedBigInteger('student_id')->unique();
 
-            $table->string('full_name')->nullable();
-            $table->string('department')->nullable();
-            $table->string('email')->nullable();
+            $table->string('full_name',100)->nullable();
+            $table->string('department',100)->nullable();
+            $table->string('email',255)->nullable();
 
             $table->enum('membership_status', ['active', 'blocked'])
                 ->default('active');

@@ -11,8 +11,8 @@ return new class extends Migration
         Schema::create('library_staff', function (Blueprint $table) {
 
             $table->id('staff_id');
-            $table->string('full_name');
-            $table->string('email')->unique();
+            $table->string('full_name', 100);
+            $table->string('email', 255)->unique();
             $table->string('password_hash');
 
             $table->enum('role', ['librarian', 'assistant'])

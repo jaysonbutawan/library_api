@@ -10,16 +10,18 @@ return new class extends Migration
     {
         Schema::create('fines', function (Blueprint $table) {
 
-            $table->id('fine_id'); 
-          
+            $table->id('fine_id');
+
             $table->foreignId('transaction_id')
-                  ->constrained('borrow_transactions', 'transaction_id')
-                  ->cascadeOnDelete();
+                ->constrained('borrow_transactions', 'transaction_id')
+                ->cascadeOnDelete();
+            $table->integer('days_late');
+            $table->decimal('rate_per_day', 10, 2);
 
             $table->decimal('amount', 10, 2);
 
             $table->enum('paid_status', ['paid', 'unpaid'])
-                  ->default('unpaid');
+                ->default('unpaid');
 
             $table->timestamp('created_at')->useCurrent();
         });

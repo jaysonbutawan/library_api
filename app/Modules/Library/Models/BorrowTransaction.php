@@ -15,8 +15,7 @@ class BorrowTransaction extends Model
         'due_date',
         'return_date',
         'status',
-        'fine_amount'
-    ];
+        ];
 
     public $timestamps = false;
 

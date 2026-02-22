@@ -22,8 +22,6 @@ return new class extends Migration
             $table->enum('status', ['borrowed', 'returned', 'overdue'])
                 ->default('borrowed');
 
-            $table->decimal('fine_amount', 10, 2)->default(0.00);
-
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')
                 ->useCurrent()

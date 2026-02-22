@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Fine extends Model
 {
     protected $primaryKey = 'fine_id';
-    protected $fillable = ['transaction_id', 'amount', 'paid_status'];
+    protected $fillable = ['transaction_id', 'amount', 'paid_status', 'days_late', 'rate_per_day'];
     public $timestamps = false;
 
     /**

@@ -12,6 +12,7 @@ class Book extends Model
         'isbn',
         'title',
         'author',
+        'status',
         'category',
         'total_copies',
         'available_copies'
