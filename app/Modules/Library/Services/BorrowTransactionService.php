@@ -25,7 +25,7 @@ class BorrowTransactionService
             throw new \Exception('Membership is blocked.', 403);
         }
 
-        $book = Book::find($data['book_id']);
+        $book = Book::where('book_id', $data['book_id'])->where('status', 'available')->first();
         if (!$book) {
             throw new ModelNotFoundException('Book not found.');
         }

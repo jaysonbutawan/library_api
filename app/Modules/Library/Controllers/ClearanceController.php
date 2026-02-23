@@ -9,7 +9,6 @@ use App\Modules\Library\Models\Fine;
 
 class ClearanceController extends Controller
 {
-    // Check library clearance for a student
     public function check($memberId)
     {
         $member = LibraryMember::find($memberId);
@@ -18,12 +17,10 @@ class ClearanceController extends Controller
             return response()->json(['message' => 'Library member not found'], 404);
         }
 
-        // Check borrowed books
         $activeBorrows = BorrowTransaction::where('library_member_id', $memberId)
             ->whereIn('status', ['borrowed', 'overdue'])
             ->count();
 
-        // Check unpaid fines
         $unpaidFines = Fine::whereHas('transaction', function ($q) use ($memberId) {
             $q->where('library_member_id', $memberId);
         })->where('paid_status', 'unpaid')->sum('amount');

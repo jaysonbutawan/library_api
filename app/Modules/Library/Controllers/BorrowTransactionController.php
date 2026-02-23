@@ -27,10 +27,8 @@ class BorrowTransactionController extends Controller
                 'message' => 'Book borrowed successfully.',
                 'data' => $transaction
             ], 201);
-
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
@@ -48,10 +46,8 @@ class BorrowTransactionController extends Controller
                 'fine_amount' => $result['fine'],
                 'data' => $result['transaction']
             ]);
-
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()

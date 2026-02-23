@@ -11,7 +11,7 @@ class BookService
  
     public function getAll()
     {
-        return Book::all();
+       return Book::where('status', 'available')->get();
     }
 
     public function create(array $data)
@@ -66,11 +66,13 @@ class BookService
     }
 
 
-    public function delete($id)
-    {
-        $book = $this->findById($id);
-        $book->delete();
+   public function destroy($id)
+{
+    $book = Book::find($id);
+    if (!$book) return response()->json(['message' => 'Book not found'], 404);
 
-        return true;
-    }
+    $book->update(['status' => 'unavailable']);
+
+    return response()->json(['message' => 'Book marked as unavailable']);
+}
 }

@@ -46,9 +46,11 @@ class BooksController extends Controller
     public function show($id)
     {
         try {
-            return response()->json(
-                $this->bookService->findById($id)
-            );
+            $book = $this->bookService->findById($id);
+            if($book->status !== 'available') {
+                return response()->json(['message' => 'Book is currently unavailable'], 404);
+            }
+            return response()->json($book);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Book not found'
@@ -84,10 +86,10 @@ class BooksController extends Controller
     public function destroy($id)
     {
         try {
-            $this->bookService->delete($id);
+            $this->bookService->destroy($id);
 
             return response()->json([
-                'message' => 'Book deleted successfully'
+                'message' => 'Book set status to unavailable successfully.'
             ]);
 
         } catch (ModelNotFoundException $e) {

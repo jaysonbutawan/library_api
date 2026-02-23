@@ -93,14 +93,12 @@ class FinesController extends Controller
             ]
         ]);
     }
-    /**
-     * Get all fines for a library member
-     */
+ //details of fines for a student
     public function memberFines($memberId)
     {
         $fines = Fine::whereHas('transaction', function ($q) use ($memberId) {
             $q->where('library_member_id', $memberId);
-        })->with('transaction.member')->get(); 
+        })->with('transaction.member')->get();
 
         $result = $fines->map(function ($fine) {
             $member = $fine->transaction->member;
@@ -118,9 +116,7 @@ class FinesController extends Controller
         return response()->json($result);
     }
 
-    /**
-     * Get unpaid fines for cashier
-     */
+   //list of all unpaid fines with student details
     public function unpaidFines()
     {
         $fines = Fine::where('paid_status', 'unpaid')->with('transaction.member')->get();
