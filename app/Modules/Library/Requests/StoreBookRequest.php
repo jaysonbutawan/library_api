@@ -32,7 +32,7 @@ class StoreBookRequest extends FormRequest
             'status' => ['nullable', 'string', 'max:50'],
             'category' => ['nullable', 'string', 'max:100'],
             'total_copies' => ['required', 'integer', 'min:1'],
-            'available_copies' => ['nullable', 'integer', 'min:0']
+            'available_copies' => ['nullable', 'integer', 'min:0', 'lte:total_copies'],
         ];
     }
 

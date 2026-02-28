@@ -117,7 +117,7 @@ class BorrowTransactionService
     /**
      * Member Transactions
      */
-    public function memberTransactions($memberId)
+    public function getBorrowTransactionsByMemberId($memberId)
     {
         return BorrowTransaction::with(['book', 'member'])
             ->where('library_member_id', $memberId)

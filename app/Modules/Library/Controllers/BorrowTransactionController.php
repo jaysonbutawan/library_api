@@ -55,10 +55,10 @@ class BorrowTransactionController extends Controller
         }
     }
 
-    public function memberTransactions($memberId)
+    public function getBorrowTransactionsByMemberId($memberId)
     {
         return response()->json(
-            $this->service->memberTransactions($memberId)
+            $this->service->getBorrowTransactionsByMemberId($memberId)
         );
     }
 }

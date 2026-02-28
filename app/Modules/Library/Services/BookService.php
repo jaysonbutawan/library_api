@@ -5,23 +5,29 @@ namespace App\Modules\Library\Services;
 use App\Modules\Library\Models\Book;
 use Faker\Calculator\Isbn;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 
 class BookService
 {
- 
+
     public function getAll()
     {
-       return Book::where('status', 'available')->get();
+        return Book::where('status', 'available')->get();
     }
 
     public function create(array $data)
     {
-        if (!empty($data['isbn']) && !Isbn::isValid($data['isbn'])) {
-            throw new \Exception('Invalid ISBN format.', 422);
+        if (empty($data['isbn'])) {
+            throw ValidationException::withMessages(['isbn' => ['Isbn is required.']]);
         }
 
         $data['available_copies'] =
             $data['available_copies'] ?? $data['total_copies'];
+        if ($data['available_copies'] > $data['total_copies']) {
+            throw ValidationException::withMessages([
+                'available_copies' => ['available_copies cannot be greater than total_copies.']
+            ]);
+        }
 
         return Book::create($data);
     }
@@ -65,14 +71,16 @@ class BookService
         return $book;
     }
 
+    public function destroy($id)
+    {
+        $book = Book::find($id);
 
-   public function destroy($id)
-{
-    $book = Book::find($id);
-    if (!$book) return response()->json(['message' => 'Book not found'], 404);
+        if (!$book) {
+            throw new ModelNotFoundException();
+        }
 
-    $book->update(['status' => 'unavailable']);
+        $book->update(['status' => 'unavailable']);
 
-    return response()->json(['message' => 'Book marked as unavailable']);
-}
+        return $book;
+    }
 }

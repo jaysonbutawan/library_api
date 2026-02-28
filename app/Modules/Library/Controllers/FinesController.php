@@ -11,30 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class FinesController extends Controller
 {
-    public function studentFines(StudentFinesRequest $request, $studentId)
-    {
-        $includePaid = $request->query('include_paid', 1);
-
-        $query = Fine::whereHas('transaction', fn($q) => $q->where('library_member_id', $studentId))
-            ->with(['transaction.book']);
-
-        if (!$includePaid) {
-            $query->where('paid_status', 'unpaid');
-        }
-
-        $fines = $query->get()->map(fn($fine) => [
-            'fine_id' => $fine->fine_id,
-            'book_title' => $fine->transaction->book->title,
-            'amount' => $fine->amount,
-            'status' => $fine->paid_status
-        ]);
-
-        return response()->json([
-            'student_id' => $studentId,
-            'fines' => $fines
-        ]);
-    }
-
     public function finesChoice(Request $request)
     {
         $query = Fine::with(['transaction.member', 'transaction.book']);
@@ -93,7 +69,7 @@ class FinesController extends Controller
             ]
         ]);
     }
- //details of fines for a student
+
     public function memberFines($memberId)
     {
         $fines = Fine::whereHas('transaction', function ($q) use ($memberId) {
@@ -116,7 +92,6 @@ class FinesController extends Controller
         return response()->json($result);
     }
 
-   //list of all unpaid fines with student details
     public function unpaidFines()
     {
         $fines = Fine::where('paid_status', 'unpaid')->with('transaction.member')->get();
