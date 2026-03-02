@@ -6,7 +6,7 @@ use App\Modules\Library\Models\LibraryMember;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class LibraryAuthService
+class AuthService
 {
     protected string $admissionApiUrl;
     protected string $admissionApiToken;

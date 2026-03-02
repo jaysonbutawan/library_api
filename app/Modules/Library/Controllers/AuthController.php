@@ -4,14 +4,14 @@ namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Library\Requests\LoginRequest;
-use App\Modules\Library\Services\LibraryAuthService;
+use App\Modules\Library\Services\AuthService;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-    protected LibraryAuthService $authService;
+    protected AuthService $authService;
 
-    public function __construct(LibraryAuthService $authService)
+    public function __construct(AuthService $authService)
     {
         $this->authService = $authService;
     }
