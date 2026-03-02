@@ -17,9 +17,7 @@ class AuthService
         $this->admissionApiToken = config('services.admission.token');
     }
 
-    /**
-     * Login a student and register them if first time
-     */
+
     public function login(array $credentials): array
     {
         $response = Http::withToken($this->admissionApiToken)
@@ -34,7 +32,6 @@ class AuthService
 
         $studentData = $response->json();
 
-        // Create or update library member
         $member = LibraryMember::updateOrCreate(
             ['student_id' => $studentData['student_id']],
             [
@@ -55,9 +52,7 @@ class AuthService
         ];
     }
 
-    /**
-     * Fetch student profile
-     */
+  
     public function profile(LibraryMember $member): array
     {
         $studentData = null;

@@ -48,7 +48,7 @@ class BookService
         $book = $this->findById($id);
 
         if (!empty($data['isbn']) && !Isbn::isValid($data['isbn'])) {
-            throw new \Exception('Invalid ISBN format.', 422);
+            throw ValidationException::withMessages(['isbn' => ['Invalid ISBN format.']]);
         }
 
         if (isset($data['total_copies']) && !isset($data['available_copies'])) {
@@ -60,10 +60,9 @@ class BookService
             isset($data['total_copies']) &&
             $data['available_copies'] > $data['total_copies']
         ) {
-            throw new \Exception(
-                'Available copies cannot exceed total copies.',
-                422
-            );
+            throw ValidationException::withMessages([
+                'available_copies' => ['Available copies cannot exceed total copies.']
+            ]);
         }
 
         $book->update($data);
@@ -76,7 +75,7 @@ class BookService
         $book = Book::find($id);
 
         if (!$book) {
-            throw new ModelNotFoundException();
+            throw new ModelNotFoundException('Book not found.');
         }
 
         $book->update(['status' => 'unavailable']);

@@ -3,111 +3,48 @@
 namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Models\Fine;
 use App\Modules\Library\Requests\PayFineRequest;
-use App\Modules\Library\Requests\StudentFinesRequest;
+use App\Modules\Library\Services\FinesService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class FinesController extends Controller
 {
+    public function __construct(
+        protected FinesService $finesService
+    ) {}
+
     public function finesChoice(Request $request)
     {
-        $query = Fine::with(['transaction.member', 'transaction.book']);
-        if ($request->has('student_id')) {
-            $studentId = $request->query('student_id');
-            $query->whereHas('transaction', fn($q) => $q->where('library_member_id', $studentId));
-        }
-        if ($request->has('department')) {
-            $department = $request->query('department');
-            $query->whereHas('transaction.member', fn($q) => $q->where('department', $department));
-        }
+        $studentId = $request->query('student_id');
+        $department = $request->query('department');
 
-        $fines = $query->get()->map(fn($fine) => [
-            'fine_id' => $fine->fine_id,
-            'book_title' => $fine->transaction->book->title,
-            'student_id' => $fine->transaction->member->student_id,
-            'student_name' => $fine->transaction->member->full_name,
-            'department' => $fine->transaction->member->department,
-            'amount' => $fine->amount,
-            'status' => $fine->paid_status,
-        ]);
+        $result = $this->finesService->listFines($studentId, $department);
 
-        return response()->json([
-            'data' => $fines,
-            'count' => $fines->count()
-        ]);
+        return response()->json($result);
     }
 
     public function payFine(PayFineRequest $request, $fineId)
     {
-        $fine = Fine::find($fineId);
-
-        if (!$fine) {
-            return response()->json([
-                'message' => 'Fine not found'
-            ], 404);
-        }
-
         $validated = $request->validated();
-        if ($validated['amount'] < $fine->amount) {
-            return response()->json([
-                'message' => 'Payment amount is less than fine'
-            ], 400);
-        }
+        $paidAmount = $validated['amount'];
 
-        DB::transaction(function () use ($fine) {
-            $fine->update(['paid_status' => 'paid']);
-        });
+        $result = $this->finesService->payFine($fineId, $paidAmount);
 
-        return response()->json([
-            'message' => 'Fine payment successful',
-            'data' => [
-                'fine_id' => $fine->fine_id,
-                'amount' => $fine->amount,
-                'status' => $fine->paid_status
-            ]
-        ]);
+        return response()->json(
+            $result['ok'] ? ['message' => $result['message'], 'data' => $result['data']] : ['message' => $result['message']],
+            $result['status']
+        );
     }
 
     public function memberFines($memberId)
     {
-        $fines = Fine::whereHas('transaction', function ($q) use ($memberId) {
-            $q->where('library_member_id', $memberId);
-        })->with('transaction.member')->get();
-
-        $result = $fines->map(function ($fine) {
-            $member = $fine->transaction->member;
-            return [
-                'fine_id' => $fine->fine_id,
-                'amount' => $fine->amount,
-                'paid_status' => $fine->paid_status,
-                'transaction_id' => $fine->transaction_id,
-                'student_name' => $member->full_name ?? null,
-                'student_department' => $member->department ?? null,
-                'student_email' => $member->email ?? null,
-            ];
-        });
-
+        $result = $this->finesService->listMemberFines($memberId);
         return response()->json($result);
     }
 
     public function unpaidFines()
     {
-        $fines = Fine::where('paid_status', 'unpaid')->with('transaction.member')->get();
-
-        $result = $fines->map(function ($fine) {
-            $member = $fine->transaction->member;
-            return [
-                'fine_id' => $fine->fine_id,
-                'amount' => $fine->amount,
-                'transaction_id' => $fine->transaction_id,
-                'student_name' => $member->full_name ?? null,
-                'student_department' => $member->department ?? null,
-                'student_email' => $member->email ?? null,
-            ];
-        });
-
+        $result = $this->finesService->listUnpaidFines();
         return response()->json($result);
     }
 }

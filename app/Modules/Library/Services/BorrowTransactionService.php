@@ -11,9 +11,8 @@ use App\Modules\Library\Models\Fine;
 
 class BorrowTransactionService
 {
-    /**
-     * Borrow Book
-     */
+    //Borrow Book
+
     public function borrow(array $data)
     {
         $member = LibraryMember::find($data['library_member_id']);
@@ -47,76 +46,74 @@ class BorrowTransactionService
                 'status' => 'borrowed'
             ]);
 
-            // Automatically deduct stock
             $book->decrement('available_copies');
 
             return $transaction;
         });
     }
 
-    /**
-     * Return Book
-     */
+    //Return Book
+
     public function returnBook($transactionId)
-{
-    $transaction = BorrowTransaction::with(['book', 'member'])
-        ->find($transactionId);
+    {
+        $transaction = BorrowTransaction::with(['book', 'member'])
+            ->find($transactionId);
 
-    if (!$transaction) {
-        throw new ModelNotFoundException('Transaction not found.');
-    }
-
-    if ($transaction->status !== 'borrowed') {
-        throw new \Exception('Book already returned.', 400);
-    }
-
-    $today = now();
-
-    return DB::transaction(function () use ($transaction, $today) {
-
-        $daysLate = 0;
-        $fineCreated = null;
-
-        if ($today->gt($transaction->due_date)) {
-
-            $daysLate = $today->diffInDays($transaction->due_date);
-
-            $rate = 0; 
-            $amount = $daysLate * $rate;
-
-            $fineCreated = Fine::create([
-                'transaction_id' => $transaction->transaction_id,
-                'days_late' => $daysLate,
-                'rate_per_day' => $rate,
-                'amount' => $amount,
-                'paid_status' => 'unpaid'
-            ]);
-
-            $transaction->update([
-                'status' => 'overdue',
-                'return_date' => $today
-            ]);
-        } else {
-
-            $transaction->update([
-                'status' => 'returned',
-                'return_date' => $today
-            ]);
+        if (!$transaction) {
+            throw new ModelNotFoundException('Transaction not found.');
         }
 
-        $transaction->book->increment('available_copies');
+        if ($transaction->status !== 'borrowed') {
+            throw new \Exception('Book already returned.', 400);
+        }
 
-        return [
-            'transaction_id' => $transaction->transaction_id,
-            'status' => $transaction->status,
-            'days_late' => $daysLate,
-            'fine' => $fineCreated
-        ];
-    });
-}
-    /**
-     * Member Transactions
-     */
+        $today = now();
+
+        return DB::transaction(function () use ($transaction, $today) {
+
+            $daysLate = 0;
+            $fineCreated = null;
+
+            if ($today->gt($transaction->due_date)) {
+
+                $daysLate = $today->diffInDays($transaction->due_date);
+
+                $rate = 0;
+                $amount = $daysLate * $rate;
+
+                $fineCreated = Fine::create([
+                    'transaction_id' => $transaction->transaction_id,
+                    'days_late' => $daysLate,
+                    'rate_per_day' => $rate,
+                    'amount' => $amount,
+                    'paid_status' => 'unpaid'
+                ]);
+
+                $transaction->update([
+                    'status' => 'overdue',
+                    'return_date' => $today
+                ]);
+            } else {
+
+                $transaction->update([
+                    'status' => 'returned',
+                    'return_date' => $today
+                ]);
+            }
+
+            $transaction->book->increment('available_copies');
+
+            return [
+                'transaction_id' => $transaction->transaction_id,
+                'status' => $transaction->status,
+                'days_late' => $daysLate,
+                'fine' => $fineCreated
+            ];
+        });
+    }
+
+    // Member Transactions
+
     public function getBorrowTransactionsByMemberId($memberId)
     {
         return BorrowTransaction::with(['book', 'member'])
