@@ -2,55 +2,152 @@
 
 namespace App\Modules\Library\Services;
 
-use App\Modules\Library\Models\LibraryStaff;
+use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class LibraryStaffService
 {
     /**
-     * Login a staff member
+     * Create staff/librarian user (stored in users table).
      */
-    public function login(string $email, string $password): ?LibraryStaff
+    public function create(array $data): User
     {
-        $staff = LibraryStaff::where('email', $email)->first();
-        if (!$staff || !Hash::check($password, $staff->password_hash) || $staff->status !== 'active') {
-            return null;
+        // Enforce staff roles only
+        $role = $data['role'] ?? 'assistant';
+        if (!in_array($role, ['librarian', 'assistant'], true)) {
+            throw ValidationException::withMessages([
+                'role' => 'Role must be librarian or assistant.',
+            ]);
         }
 
-        // Update last login timestamp
-        $staff->update(['last_login' => now()]);
+        // Email normalization
+        $email = strtolower(trim($data['email'] ?? ''));
+        if (!$email) {
+            throw ValidationException::withMessages([
+                'email' => 'Email is required.',
+            ]);
+        }
 
-        return $staff;
+        // Prevent creating staff with an email that already exists
+        if (User::where('email', $email)->exists()) {
+            throw ValidationException::withMessages([
+                'email' => 'Email is already taken.',
+            ]);
+        }
+
+        // Password required for staff
+        $plainPassword = (string) ($data['password'] ?? '');
+        if ($plainPassword === '') {
+            throw ValidationException::withMessages([
+                'password' => 'Password is required for staff accounts.',
+            ]);
+        }
+
+        $user = User::create([
+            'student_id' => null, // staff always null
+            'full_name' => $data['full_name'] ?? null,
+            'department' => $data['department'] ?? null,
+            'email' => $email,
+            'password' => Hash::make($plainPassword),
+            'role' => $role,
+            'status' => $data['status'] ?? 'active',
+            'registered_at' => now(),
+            'last_login' => null,
+        ]);
+
+        return $user;
     }
 
     /**
-     * Create a new staff member
+     * Update staff/librarian user.
      */
-    public function create(array $data): LibraryStaff
+    public function update(User $staff, array $data): User
     {
-        $data['password_hash'] = Hash::make($data['password']);
-        unset($data['password']);
-        return LibraryStaff::create($data);
-    }
+        // Ensure you're updating a staff account
+        if (!is_null($staff->student_id) || !in_array($staff->role, ['librarian', 'assistant'], true)) {
+            throw ValidationException::withMessages([
+                'staff' => 'Target user is not a staff account.',
+            ]);
+        }
 
-    /**
-     * Update a staff member
-     */
-    public function update(LibraryStaff $staff, array $data): LibraryStaff
-    {
+        // If changing email, normalize + ensure unique
+        if (array_key_exists('email', $data) && $data['email'] !== null) {
+            $email = strtolower(trim($data['email']));
+            if ($email === '') {
+                throw ValidationException::withMessages(['email' => 'Email cannot be empty.']);
+            }
+
+            $exists = User::where('email', $email)
+                ->where('id', '!=', $staff->id)
+                ->exists();
+
+            if ($exists) {
+                throw ValidationException::withMessages(['email' => 'Email is already taken.']);
+            }
+
+            $staff->email = $email;
+        }
+
+        // If changing role, validate allowed values
+        if (array_key_exists('role', $data) && $data['role'] !== null) {
+            if (!in_array($data['role'], ['librarian', 'assistant'], true)) {
+                throw ValidationException::withMessages([
+                    'role' => 'Role must be librarian or assistant.',
+                ]);
+            }
+            $staff->role = $data['role'];
+        }
+
+        if (array_key_exists('full_name', $data)) {
+            $staff->full_name = $data['full_name'];
+        }
+
+        if (array_key_exists('department', $data)) {
+            $staff->department = $data['department'];
+        }
+
+        if (array_key_exists('status', $data) && $data['status'] !== null) {
+            if (!in_array($data['status'], ['active', 'blocked', 'inactive'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Status must be active, blocked, or inactive.',
+                ]);
+            }
+            $staff->status = $data['status'];
+        }
+
+        // Optional password update
         if (!empty($data['password'])) {
-            $data['password_hash'] = Hash::make($data['password']);
-            unset($data['password']);
+            $staff->password = Hash::make((string) $data['password']);
         }
-        $staff->update($data);
+
+        $staff->save();
+
         return $staff;
     }
 
     /**
-     * Delete a staff member
+     * Soft-delete style: mark inactive (recommended),
+     * OR hard delete if you really want.
      */
-    public function delete(LibraryStaff $staff): void
+    public function delete(User $staff): void
     {
-        $staff->delete();
+        // Recommended: do not hard delete accounts
+        $staff->status = 'inactive';
+        $staff->save();
+
+        // If you want HARD delete instead:
+        // $staff->delete();
+    }
+
+      public function getStaff(?int $id = null)
+    {
+        $query = User::whereIn('role', ['librarian', 'assistant']);
+
+        if ($id) {
+            return $query->where('id', $id)->first();
+        }
+
+        return $query->get();
     }
 }

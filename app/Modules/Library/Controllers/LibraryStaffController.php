@@ -3,11 +3,10 @@
 namespace App\Modules\Library\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Requests\StaffLoginRequest;
+use App\Models\User;
 use App\Modules\Library\Requests\StoreStaffRequest;
 use App\Modules\Library\Requests\UpdateStaffRequest;
 use App\Modules\Library\Services\LibraryStaffService;
-use App\Modules\Library\Models\LibraryStaff;
 
 class LibraryStaffController extends Controller
 {
@@ -17,33 +16,17 @@ class LibraryStaffController extends Controller
     {
         $this->staffService = $staffService;
     }
-
-    public function login(StaffLoginRequest $request)
+    public function show(?int $id = null)
     {
-        $staff = $this->staffService->login($request->email, $request->password);
+        $staff = $this->staffService->getStaff($id);
 
         if (!$staff) {
-            return response()->json(['message' => 'Invalid credentials or inactive account'], 401);
+            return response()->json([
+                'message' => 'Staff not found'
+            ], 404);
         }
 
-        $token = $staff->createToken('staff-token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-            'staff' => [
-                'id' => $staff->staff_id,
-                'name' => $staff->full_name,
-                'email' => $staff->email,
-                'role' => $staff->role,
-                'status' => $staff->status
-            ]
-        ]);
-    }
-
-    public function index()
-    {
-        return response()->json(LibraryStaff::all());
+        return response()->json($staff);
     }
 
     public function store(StoreStaffRequest $request)
@@ -55,7 +38,7 @@ class LibraryStaffController extends Controller
         ], 201);
     }
 
-    public function update(UpdateStaffRequest $request, LibraryStaff $staff)
+    public function update(UpdateStaffRequest $request, User $staff)
     {
         $staff = $this->staffService->update($staff, $request->validated());
         return response()->json([
@@ -64,14 +47,9 @@ class LibraryStaffController extends Controller
         ]);
     }
 
-    public function destroy(LibraryStaff $staff)
+    public function destroy(User $staff)
     {
         $this->staffService->delete($staff);
         return response()->json(['message' => 'Staff deleted successfully']);
-    }
-
-    public function show(LibraryStaff $staff)
-    {
-        return response()->json($staff);
     }
 }

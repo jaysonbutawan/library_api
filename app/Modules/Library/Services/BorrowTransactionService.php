@@ -2,6 +2,7 @@
 
 namespace App\Modules\Library\Services;
 
+use App\Models\User;
 use App\Modules\Library\Models\BorrowTransaction;
 use App\Modules\Library\Models\Book;
 use App\Modules\Library\Models\LibraryMember;
@@ -15,7 +16,7 @@ class BorrowTransactionService
 
     public function borrow(array $data)
     {
-        $member = LibraryMember::find($data['library_member_id']);
+        $member = User::find($data['id']);
         if (!$member) {
             throw new ModelNotFoundException('Member not found.');
         }
@@ -39,7 +40,7 @@ class BorrowTransactionService
             $dueDate = now()->addDays(7);
 
             $transaction = BorrowTransaction::create([
-                'library_member_id' => $member->library_member_id,
+                'id' => $member->id,
                 'book_id' => $book->book_id,
                 'borrow_date' => $borrowDate,
                 'due_date' => $dueDate,
@@ -114,10 +115,10 @@ class BorrowTransactionService
 
     // Member Transactions
 
-    public function getBorrowTransactionsByMemberId($memberId)
+    public function getBorrowTransactionsByMemberId($userId)
     {
         return BorrowTransaction::with(['book', 'member'])
-            ->where('library_member_id', $memberId)
+            ->where('id', $userId)
             ->get()
             ->map(function ($t) {
                 return [

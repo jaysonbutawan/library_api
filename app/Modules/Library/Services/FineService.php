@@ -17,7 +17,7 @@ class FinesService
         $query = Fine::query()->with(['transaction.member', 'transaction.book']);
 
         if ($studentId !== null && $studentId !== '') {
-            $query->whereHas('transaction', fn($q) => $q->where('library_member_id', $studentId));
+            $query->whereHas('transaction', fn($q) => $q->where('id', $studentId));
         }
 
         if ($department !== null && $department !== '') {

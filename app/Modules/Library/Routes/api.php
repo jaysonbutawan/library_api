@@ -7,44 +7,48 @@ use App\Modules\Library\Controllers\FinesController;
 use App\Modules\Library\Controllers\BooksController;
 use App\Modules\Library\Controllers\LibraryStaffController;
 use App\Modules\Library\Controllers\ClearanceController;
+use App\Modules\Library\Controllers\StaffAuthController;
+use Termwind\Components\Raw;
 
 Route::prefix('library')->group(function () {
 
-    // Auth (Student login)
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->name('student.login');
+    Route::post('/staff/login', [StaffAuthController::class, 'login'])->name('staff.login');
 
-    // Protected routes (requires token)
-    Route::middleware('auth:sanctum')->group(function () {});
-    // Book routes
-    Route::get('/books', [BooksController::class, 'index']);
-    Route::get('/books/{id}', [BooksController::class, 'show']);
-    Route::post('/books', [BooksController::class, 'store']);
-    Route::put('/books/{id}', [BooksController::class, 'update']);
-    Route::delete('/books/{id}', [BooksController::class, 'destroy']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/profile', [AuthController::class, 'profile'])->name('student.profile');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('student.logout');
 
-    // Borrow & Return routes
-    Route::post('/borrow', [BorrowTransactionController::class, 'borrow']);
-    Route::post('/return/{transactionId}', [BorrowTransactionController::class, 'returnBook']);
-    Route::get('/transactions/{memberId}', [BorrowTransactionController::class, 'getBorrowTransactionsByMemberId']);
+        Route::prefix('books')->name('books.')->group(function () {
+            Route::get('/books', [BooksController::class, 'index'])->name('index');
+            Route::get('/books/{id}', [BooksController::class, 'show'])->name('show');
+            Route::post('/books', [BooksController::class, 'store'])->name('store');
+            Route::put('/books/{id}', [BooksController::class, 'update'])->name('update');
+            Route::delete('/books/{id}', [BooksController::class, 'destroy'])->name('destroy');
+        });
 
-    // Fines routes
-    Route::get('/fines/choice', [FinesController::class, 'finesChoice']);
-    Route::post('/fines/pay/{fineId}', [FinesController::class, 'payFine']);
-    Route::get('/fines/member/{memberId}', [FinesController::class, 'memberFines']);
-    Route::get('/fines/unpaid', [FinesController::class, 'unpaidFines']);
+        Route::prefix('transactions')->name('transactions.')->group(function () {
+            Route::post('/borrow', [BorrowTransactionController::class, 'borrow'])->name('borrow');
+            Route::post('/{transactionId}', [BorrowTransactionController::class, 'returnBook'])->name('returnBook');
+            Route::get('/{memberId}', [BorrowTransactionController::class, 'getBorrowTransactionsByMemberId'])->name('getBorrowTransactionsByMemberId');
+        });
 
-    // Clearance route
-    Route::get( '/library-members/{memberId}/clearance',[ClearanceController::class, 'check']
-    );
-
-    // Library Staff routes (optional)
-    Route::get('/staff', [LibraryStaffController::class, 'index']);
-    Route::get('/staff/{id}', [LibraryStaffController::class, 'show']);
-    Route::post('/staff', [LibraryStaffController::class, 'store']);
-    Route::put('/staff/{id}', [LibraryStaffController::class, 'update']);
-    Route::delete('/staff/{id}', [LibraryStaffController::class, 'destroy']);
+        Route::prefix('fines')->name('fines.')->group(function () {
+            Route::get('/fines/choice', [FinesController::class, 'finesChoice'])->name('finesChoice');
+            Route::post('/fines/pay/{fineId}', [FinesController::class, 'payFine'])->name('payFine');
+            Route::get('/fines/member/{memberId}', [FinesController::class, 'memberFines'])->name('memberFines');
+            Route::get('/fines/unpaid', [FinesController::class, 'unpaidFines'])->name('unpaidFines');
+        });
 
 
-    //Staff login 
-    Route::post('/staff/login', [LibraryStaffController::class, 'login']);
+        Route::get('/library-members/{memberId}/clearance',[ClearanceController::class, 'check'])->name('clearance.check');
+
+        Route::prefix('staff')->name('staff.')->group(function () {
+            Route::get('/{id}', [LibraryStaffController::class, 'show'])->name('show');
+            Route::post('/', [LibraryStaffController::class, 'store'])->name('store');
+            Route::put('/{staff}', [LibraryStaffController::class, 'update'])->name('update');
+            Route::delete('/{staff}', [LibraryStaffController::class, 'destroy'])->name('destroy');
+            Route::post('/logout', [StaffAuthController::class, 'logout'])->name('logout');
+        });
+    });
 });

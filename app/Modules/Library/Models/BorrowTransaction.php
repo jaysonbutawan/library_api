@@ -3,13 +3,15 @@
 namespace App\Modules\Library\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
+use App\Modules\Library\Models\Book;
 
 class BorrowTransaction extends Model
 {
     protected $primaryKey = 'transaction_id';
 
     protected $fillable = [
-        'library_member_id',
+        'id',
         'book_id',
         'borrow_date',
         'due_date',
@@ -21,11 +23,16 @@ class BorrowTransaction extends Model
 
     public function member()
     {
-        return $this->belongsTo(LibraryMember::class, 'library_member_id');
+        return $this->belongsTo(User::class, 'id');
     }
 
     public function book()
     {
         return $this->belongsTo(Book::class, 'book_id');
+    }
+
+    public function fine()
+    {
+        return $this->hasOne(Fine::class, 'transaction_id', 'transaction_id');
     }
 }

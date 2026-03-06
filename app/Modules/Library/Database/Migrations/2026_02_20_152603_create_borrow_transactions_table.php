@@ -12,7 +12,7 @@ return new class extends Migration
 
             $table->id('transaction_id');
 
-            $table->unsignedBigInteger('library_member_id');
+            $table->unsignedBigInteger('id');
             $table->unsignedBigInteger('book_id');
 
             $table->date('borrow_date');

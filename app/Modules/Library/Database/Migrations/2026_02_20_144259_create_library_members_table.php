@@ -6,31 +6,62 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('library_members', function (Blueprint $table) {
+        Schema::create('users', function (Blueprint $table) {
 
-            $table->id('library_member_id');
+            $table->id();
 
-            $table->unsignedBigInteger('student_id')->unique();
+            $table->unsignedBigInteger('student_id')->nullable()->unique();
 
             $table->string('full_name',100)->nullable();
             $table->string('department',100)->nullable();
-            $table->string('email',255)->nullable();
 
-            $table->enum('membership_status', ['active', 'blocked'])
-                ->default('active');
+            $table->string('email')->nullable()->unique();
+            $table->timestamp('email_verified_at')->nullable();
+
+
+            $table->string('password')->nullable();
+
+            $table->enum('role', ['student','librarian','assistant'])
+                  ->default('student');
+
+            $table->enum('status', ['active','blocked','inactive'])
+                  ->default('active');
 
             $table->timestamp('registered_at')->useCurrent();
+            $table->timestamp('last_login')->nullable();
 
-            $table->timestamp('updated_at')
-                ->useCurrent()
-                ->useCurrentOnUpdate();
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->string('email')->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->foreignId('user_id')->nullable()->index();
+            $table->string('ip_address',45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('library_members');
+        Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };

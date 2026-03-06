@@ -2,7 +2,7 @@
 
 namespace App\Modules\Library\Services;
 
-use App\Modules\Library\Models\LibraryMember;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -17,29 +17,30 @@ class AuthService
         $this->admissionApiToken = config('services.admission.token');
     }
 
-
     public function login(array $credentials): array
     {
         $response = Http::withToken($this->admissionApiToken)
-            ->post("{$this->admissionApiUrl}/api/admission/login", $credentials);
+            ->post("{$this->admissionApiUrl}/api/auth/login", $credentials);
 
         if (!$response->successful()) {
             return [
                 'success' => false,
-                'message' => 'Invalid credentials.'
+                'message' => 'Invalid credentials.',
             ];
         }
 
         $studentData = $response->json();
 
-        $member = LibraryMember::updateOrCreate(
+        $member = User::updateOrCreate(
             ['student_id' => $studentData['student_id']],
             [
-                'membership_status' => 'active',
+                'status' => 'active',                
                 'registered_at' => now(),
-                'full_name' => $studentData['full_name'],
-                'department' => $studentData['department'],
-                'email' => $studentData['email'],
+                'full_name' => $studentData['full_name'] ?? null,
+                'department' => $studentData['department'] ?? null,
+                'email' => $studentData['email'] ?? null,
+                'role' => 'student',                 
+                'password' => null,                 
             ]
         );
 
@@ -48,14 +49,14 @@ class AuthService
         return [
             'success' => true,
             'member' => $member,
-            'token' => $token
+            'token' => $token,
         ];
     }
 
-  
-    public function profile(LibraryMember $member): array
+    public function profile(User $member): array
     {
         $studentData = null;
+
         try {
             $response = Http::withToken($this->admissionApiToken)
                 ->get("{$this->admissionApiUrl}/api/students/{$member->student_id}");
@@ -72,7 +73,8 @@ class AuthService
             'name' => $studentData['full_name'] ?? $member->full_name,
             'department' => $studentData['department'] ?? $member->department,
             'email' => $studentData['email'] ?? $member->email,
-            'membership_status' => $member->membership_status
+            'status' => $member->status, 
+            'role' => $member->role,
         ];
     }
 }
