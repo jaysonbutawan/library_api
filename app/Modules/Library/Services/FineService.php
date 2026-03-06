@@ -4,37 +4,24 @@ namespace App\Modules\Library\Services;
 
 use App\Modules\Library\Models\Fine;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class FinesService
 {
-    /**
-     * Admin filtering endpoint:
-     * filter by student_id and/or department
-     */
     public function listFines(?string $studentId = null, ?string $department = null): array
     {
         $query = Fine::query()->with(['transaction.member', 'transaction.book']);
 
         if ($studentId !== null && $studentId !== '') {
-            $query->whereHas('transaction', fn($q) => $q->where('id', $studentId));
+            $query->whereHas('transaction.member', fn($q) => $q->where('student_id', $studentId));
         }
 
         if ($department !== null && $department !== '') {
             $query->whereHas('transaction.member', fn($q) => $q->where('department', $department));
         }
 
-        $fines = $query->get();
-
-        $data = $fines->map(fn(Fine $fine) => [
-            'fine_id' => $fine->fine_id,
-            'book_title' => optional($fine->transaction?->book)->title,
-            'student_id' => optional($fine->transaction?->member)->student_id,
-            'student_name' => optional($fine->transaction?->member)->full_name,
-            'department' => optional($fine->transaction?->member)->department,
-            'amount' => $fine->amount,
-            'status' => $fine->paid_status,
-        ])->values();
+        $data = $query->get()
+            ->map(fn(Fine $fine) => $this->formatAdminFine($fine))
+            ->values();
 
         return [
             'data' => $data,
@@ -42,7 +29,6 @@ class FinesService
         ];
     }
 
-    // Pay a fine: validates payment >= fine amount and updates paid_status.
     public function payFine(int|string $fineId, float|int $paidAmount): array
     {
         $fine = Fine::query()->find($fineId);
@@ -63,13 +49,9 @@ class FinesService
             ];
         }
 
-        DB::transaction(function () use ($fine) {
-            if ($fine->paid_status !== 'paid') {
-                $fine->update(['paid_status' => 'paid']);
-            }
-        });
-
-        $fine->refresh();
+        if ($fine->paid_status !== 'paid') {
+            $fine->update(['paid_status' => 'paid']);
+        }
 
         return [
             'ok' => true,
@@ -83,50 +65,60 @@ class FinesService
         ];
     }
 
-    // Member fines list (all statuses) with member info.
-
     public function listMemberFines(int|string $memberId): Collection
     {
-        $fines = Fine::query()
-            ->whereHas('transaction', fn($q) => $q->where('library_member_id', $memberId))
+        return Fine::query()
+            ->whereHas('transaction', fn($q) => $q->where('id', $memberId))
             ->with('transaction.member')
-            ->get();
-
-        return $fines->map(function (Fine $fine) {
-            $member = $fine->transaction?->member;
-
-            return [
-                'fine_id' => $fine->fine_id,
-                'amount' => $fine->amount,
-                'paid_status' => $fine->paid_status,
-                'transaction_id' => $fine->transaction_id,
-                'student_name' => $member?->full_name,
-                'student_department' => $member?->department,
-                'student_email' => $member?->email,
-            ];
-        })->values();
+            ->get()
+            ->map(fn(Fine $fine) => $this->formatMemberFine($fine, true))
+            ->values();
     }
-
-    // Unpaid fines list with member info.
 
     public function listUnpaidFines(): Collection
     {
-        $fines = Fine::query()
+        return Fine::query()
             ->where('paid_status', 'unpaid')
             ->with('transaction.member')
-            ->get();
+            ->get()
+            ->map(fn(Fine $fine) => $this->formatMemberFine($fine, false))
+            ->values();
+    }
 
-        return $fines->map(function (Fine $fine) {
-            $member = $fine->transaction?->member;
+    protected function formatAdminFine(Fine $fine): array
+    {
+        $transaction = $fine->transaction;
+        $member = $transaction?->member;
+        $book = $transaction?->book;
 
-            return [
-                'fine_id' => $fine->fine_id,
-                'amount' => $fine->amount,
-                'transaction_id' => $fine->transaction_id,
-                'student_name' => $member?->full_name,
-                'student_department' => $member?->department,
-                'student_email' => $member?->email,
-            ];
-        })->values();
+        return [
+            'fine_id' => $fine->fine_id,
+            'book_title' => $book?->title,
+            'student_id' => $member?->student_id,
+            'student_name' => $member?->full_name,
+            'department' => $member?->department,
+            'amount' => $fine->amount,
+            'status' => $fine->paid_status,
+        ];
+    }
+
+    protected function formatMemberFine(Fine $fine, bool $includeStatus = true): array
+    {
+        $member = $fine->transaction?->member;
+
+        $data = [
+            'fine_id' => $fine->fine_id,
+            'amount' => $fine->amount,
+            'transaction_id' => $fine->transaction_id,
+            'student_name' => $member?->full_name,
+            'student_department' => $member?->department,
+            'student_email' => $member?->email,
+        ];
+
+        if ($includeStatus) {
+            $data['paid_status'] = $fine->paid_status;
+        }
+
+        return $data;
     }
 }

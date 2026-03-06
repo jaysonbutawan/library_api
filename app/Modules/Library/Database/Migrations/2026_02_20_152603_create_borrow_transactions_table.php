@@ -12,7 +12,7 @@ return new class extends Migration
 
             $table->id('transaction_id');
 
-            $table->unsignedBigInteger('id');
+            $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('book_id');
 
             $table->date('borrow_date');
@@ -27,9 +27,9 @@ return new class extends Migration
                 ->useCurrent()
                 ->useCurrentOnUpdate();
 
-            $table->foreign('library_member_id')
-                ->references('library_member_id')
-                ->on('library_members')
+            $table->foreign('user_id')
+                ->references('id')
+                ->on('users')
                 ->onDelete('cascade');
 
             $table->foreign('book_id')

@@ -17,11 +17,25 @@ class BooksController extends Controller
         $this->bookService = $bookService;
     }
 
-    public function index()
+    public function index($id = null)
     {
-        return response()->json(
-            $this->bookService->getAll()
-        );
+        try {
+            $books = $this->bookService->getBooks($id);
+
+            if ($id !== null) {
+                if ($books->status !== 'available') {
+                    return response()->json([
+                        'message' => 'Book is currently unavailable'
+                    ], 404);
+                }
+            }
+
+            return response()->json($books);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Book not found'
+            ], 404);
+        }
     }
 
     public function store(StoreBookRequest $request)
@@ -35,26 +49,10 @@ class BooksController extends Controller
                 'message' => 'Book created successfully.',
                 'data' => $book
             ], 201);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
             ], $e->getCode() ?: 500);
-        }
-    }
-
-    public function show($id)
-    {
-        try {
-            $book = $this->bookService->findById($id);
-            if($book->status !== 'available') {
-                return response()->json(['message' => 'Book is currently unavailable'], 404);
-            }
-            return response()->json($book);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Book not found'
-            ], 404);
         }
     }
 
@@ -70,12 +68,10 @@ class BooksController extends Controller
                 'message' => 'Book updated successfully.',
                 'data' => $book
             ]);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Book not found.'
             ], 404);
-
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage()
@@ -91,7 +87,6 @@ class BooksController extends Controller
             return response()->json([
                 'message' => 'Book set status to unavailable successfully.'
             ]);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Book not found'

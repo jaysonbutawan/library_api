@@ -10,11 +10,6 @@ use Illuminate\Validation\ValidationException;
 class BookService
 {
 
-    public function getAll()
-    {
-        return Book::where('status', 'available')->get();
-    }
-
     public function create(array $data)
     {
         if (empty($data['isbn'])) {
@@ -32,20 +27,19 @@ class BookService
         return Book::create($data);
     }
 
-    public function findById($id)
+    public function getBooks($id = null)
     {
-        $book = Book::find($id);
-
-        if (!$book) {
-            throw new ModelNotFoundException('Book not found.');
+        if ($id === null) {
+            return Book::all();
         }
 
-        return $book;
+        return Book::findOrFail($id);
     }
+
 
     public function update($id, array $data)
     {
-        $book = $this->findById($id);
+        $book = $this->getBooks($id);
 
         if (!empty($data['isbn']) && !Isbn::isValid($data['isbn'])) {
             throw ValidationException::withMessages(['isbn' => ['Invalid ISBN format.']]);
