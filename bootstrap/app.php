@@ -9,11 +9,14 @@ return Application::configure(basePath: dirname(__DIR__))
     App\Modules\Library\LibraryServiceProvider::class,
     ])
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(\App\Http\Middleware\AuthMiddleware::class);
+    })
+   ->withExceptions(function (Exceptions $exceptions): void {
+    
+
     })->create();

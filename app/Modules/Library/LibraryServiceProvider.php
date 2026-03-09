@@ -3,6 +3,7 @@
 namespace App\Modules\Library;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 
 class LibraryServiceProvider extends ServiceProvider
 {
@@ -12,7 +13,11 @@ class LibraryServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/Database/Migrations');
-        $this->loadRoutesFrom(__DIR__ . '/Routes/api.php');
+        $this->registerRoutes();
+    }
+
+    protected function registerRoutes(): void
+    {
+        Route::prefix('api')->group(__DIR__ . '/Routes/api.php');
     }
 }

@@ -14,7 +14,7 @@ Route::prefix('library')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('student.login');
     Route::post('/staff/login', [StaffAuthController::class, 'login'])->name('staff.login');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('auth:sanctum','api')->group(function () {
         Route::get('/profile', [AuthController::class, 'profile'])->name('student.profile');
         Route::post('/logout', [AuthController::class, 'logout'])->name('student.logout');
 
