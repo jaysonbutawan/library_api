@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Book extends Model
 {
     protected $primaryKey = 'book_id';
-    
+
     protected $fillable = [
         'isbn',
         'title',
@@ -15,6 +15,7 @@ class Book extends Model
         'status',
         'category',
         'total_copies',
+        'publication_year',
         'available_copies'
     ];
 
