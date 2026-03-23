@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -20,7 +21,7 @@ class User extends Authenticatable
         'department',
         'email',
         'password',
-        'role',
+        'role_id',
         'status',
         'registered_at',
         'last_login'
@@ -36,6 +37,10 @@ class User extends Authenticatable
         'registered_at' => 'datetime',
         'last_login' => 'datetime',
     ];
+     public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
 
 
     public function isStudent(): bool
@@ -46,13 +51,13 @@ class User extends Authenticatable
 
     public function isLibrarian(): bool
     {
-        return $this->role === 'librarian';
+        return $this->role->name === 'librarian';
     }
 
 
     public function isAssistant(): bool
     {
-        return $this->role === 'assistant';
+        return $this->role->name === 'assistant';
     }
 
     public function isActive(): bool

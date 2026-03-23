@@ -26,8 +26,7 @@ return new class extends Migration
 
             $table->string('password')->nullable();
 
-            $table->enum('role', ['student','librarian','assistant'])
-                  ->default('student');
+           $table->foreignId('role_id')->constrained('roles')->onDelete('cascade');
 
             $table->enum('status', ['active','blocked','inactive'])
                   ->default('active');
