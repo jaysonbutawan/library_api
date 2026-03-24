@@ -48,7 +48,7 @@ class User extends Authenticatable
 
     public function isLibrarian(): bool
     {
-        return $this->role->name === 'librarian';
+        return $this->role->name === 'Librarian';
     }
 
 
