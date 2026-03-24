@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Services\BookService;
-use App\Modules\Library\Requests\StoreBookRequest;
-use App\Modules\Library\Requests\UpdateBookRequest;
+use App\Http\Services\BookService;
+use App\Http\Requests\StoreBookRequest;
+use App\Http\Requests\UpdateBookRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class BooksController extends Controller

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Services\BorrowTransactionService;
-use App\Modules\Library\Requests\BorrowBookRequest;
+use App\Http\Services\BorrowTransactionService;
+use App\Http\Requests\BorrowBookRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class BorrowTransactionController extends Controller

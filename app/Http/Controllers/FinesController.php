@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Requests\PayFineRequest;
-use App\Modules\Library\Services\FinesService;
+use App\Http\Requests\PayFineRequest;
+use App\Http\services\FinesService;
 use Illuminate\Http\Request;
 
 class FinesController extends Controller

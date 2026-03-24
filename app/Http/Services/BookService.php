@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\Library\Services;
+namespace App\Http\Services;
 
-use App\Modules\Library\Models\Book;
+use App\Models\Book;
 use Faker\Calculator\Isbn;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;

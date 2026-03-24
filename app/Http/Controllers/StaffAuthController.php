@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Library\Services\StaffAuthService;
+use App\Http\Services\StaffAuthService;
 use Illuminate\Http\Request;
+use App\Http\Requests\StaffLoginRequest;
 
 class StaffAuthController extends Controller
 {
-    public function login(Request $request, StaffAuthService $service)
+    public function login(StaffLoginRequest $request, StaffAuthService $service)
     {
         $data = $request->validate([
             'email' => ['required', 'email'],

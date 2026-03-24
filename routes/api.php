@@ -1,15 +1,21 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Modules\Library\Controllers\AuthController;
-use App\Modules\Library\Controllers\BorrowTransactionController;
-use App\Modules\Library\Controllers\FinesController;
-use App\Modules\Library\Controllers\BooksController;
-use App\Modules\Library\Controllers\LibraryStaffController;
-use App\Modules\Library\Controllers\ClearanceController;
-use App\Modules\Library\Controllers\StaffAuthController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BorrowTransactionController;
+use App\Http\Controllers\FinesController;
+use App\Http\Controllers\BooksController;
+use App\Http\Controllers\LibraryStaffController;
+use App\Http\Controllers\ClearanceController;
+use App\Http\Controllers\StaffAuthController;
+
 
 Route::prefix('library')->group(function () {
+
+Route::get('/test', function () {
+    return response()->json(['message' => 'Library API is working!']);
+});
+
 
     Route::post('/login', [AuthController::class, 'login'])->name('student.login');
     Route::post('/staff/login', [StaffAuthController::class, 'login'])->name('staff.login');

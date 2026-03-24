@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Modules\Library\Models;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
-use App\Modules\Library\Models\Book;
+use App\Models\Book;
 
 class BorrowTransaction extends Model
 {

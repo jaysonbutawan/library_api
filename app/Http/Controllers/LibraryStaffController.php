@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Modules\Library\Requests\StoreStaffRequest;
-use App\Modules\Library\Requests\UpdateStaffRequest;
-use App\Modules\Library\Services\LibraryStaffService;
+use App\Http\Requests\StoreStaffRequest;
+use App\Http\Requests\UpdateStaffRequest;
+use App\Http\Services\LibraryStaffService;
 
 class LibraryStaffController extends Controller
 {

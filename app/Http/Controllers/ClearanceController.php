@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Modules\Library\Controllers;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Modules\Library\Models\BorrowTransaction;
-use App\Modules\Library\Models\Fine;
+use App\Models\BorrowTransaction;
+use App\Models\Fine;
 
 class ClearanceController extends Controller
 {

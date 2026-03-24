@@ -1,14 +1,13 @@
 <?php
 
-namespace App\Modules\Library\Services;
+namespace App\Http\Services;
 
 use App\Models\User;
-use App\Modules\Library\Models\BorrowTransaction;
-use App\Modules\Library\Models\Book;
-use App\Modules\Library\Models\LibraryMember;
+use App\Models\BorrowTransaction;
+use App\Models\Book;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use App\Modules\Library\Models\Fine;
+use App\Models\Fine;
 
 class BorrowTransactionService
 {

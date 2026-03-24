@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Library\Services;
+namespace App\Http\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Http;

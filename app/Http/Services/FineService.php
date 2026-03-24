@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Modules\Library\Services;
+namespace App\Http\Services;
 
-use App\Modules\Library\Models\Fine;
+use App\Models\Fine;
 use Illuminate\Support\Collection;
 
 class FinesService
