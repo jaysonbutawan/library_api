@@ -26,12 +26,12 @@ class BookService
     }
 
     public function getBooks($id = null)
-    {
-        if ($id === null) {
-            return Book::all();
-        }
-        return Book::findOrFail($id);
+{
+    if ($id === null) {
+        return Book::with('category')->get();
     }
+    return Book::with('category')->findOrFail($id);
+}
 
 
     public function update($id, array $data)
