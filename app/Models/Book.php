@@ -12,11 +12,16 @@ class Book extends Model
         'title',
         'author',
         'status',
-        'category',
+        'category_id',
         'total_copies',
         'publication_year',
         'available_copies'
     ];
 
     public $timestamps = false;
+
+     public function category()
+    {
+        return $this->belongsTo(Category::class, 'category_id', 'category_id');
+    }
 }

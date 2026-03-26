@@ -29,7 +29,7 @@ class UpdateBookRequest extends FormRequest
             ],
 
             'author' => ['sometimes', 'required', 'string', 'max:255'],
-            'category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'category_id' => ['sometimes', 'integer', 'exists:categories,category_id'],
             'publication_year' => ['sometimes', 'nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'total_copies' => ['sometimes', 'required', 'integer', 'min:1'],
             'available_copies' => ['sometimes', 'nullable', 'integer', 'min:0'],

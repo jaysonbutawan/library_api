@@ -30,7 +30,7 @@ class StoreBookRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:50'],
-            'category' => ['nullable', 'string', 'max:100'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,category_id'],
             'total_copies' => ['required', 'integer', 'min:1'],
             'available_copies' => ['nullable', 'integer', 'min:0', 'lte:total_copies'],
         ];
@@ -44,7 +44,8 @@ class StoreBookRequest extends FormRequest
             'title.required' => 'Title cannot be empty.',
             'author.required' => 'Author cannot be empty.',
             'total_copies.min' => 'Total copies must be at least 1.',
-            'title.unique' => 'A book with this title and ISBN already exists.'
+            'title.unique' => 'A book with this title and ISBN already exists.',
+            'category_id.exists' => 'Selected category does not exist.'
         ];
     }
 }

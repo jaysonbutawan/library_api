@@ -8,6 +8,7 @@ use App\Http\Controllers\BooksController;
 use App\Http\Controllers\LibraryStaffController;
 use App\Http\Controllers\ClearanceController;
 use App\Http\Controllers\StaffAuthController;
+use App\Http\Controllers\CategoryController;
 
 
 Route::prefix('library')->group(function () {
@@ -23,6 +24,13 @@ Route::get('/test', function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [AuthController::class, 'profile'])->name('student.profile');
         Route::post('/logout', [AuthController::class, 'logout'])->name('student.logout');
+
+        Route::prefix('categories')->name('categories.')->group(function () {
+            Route::get('/{id?}', [CategoryController::class, 'index'])->name('index');
+            Route::post('/', [CategoryController::class, 'store'])->name('store');
+            Route::put('/{id}', [CategoryController::class, 'update'])->name('update');
+            Route::delete('/{id}', [CategoryController::class, 'destroy'])->name('destroy');
+        });
 
         Route::prefix('books')->name('books.')->group(function () {
             Route::get('/{id?}', [BooksController::class, 'index'])->name('index');
