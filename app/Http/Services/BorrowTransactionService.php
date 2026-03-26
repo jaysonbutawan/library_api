@@ -11,48 +11,34 @@ use App\Models\Fine;
 
 class BorrowTransactionService
 {
-    //Borrow Book
-
     public function borrow(array $data)
     {
-        $member = User::find($data['id']);
-        if (!$member) {
-            throw new ModelNotFoundException('Member not found.');
-        }
+        $member = User::findOrFail($data['user_id']);
 
-        if ($member->membership_status !== 'active') {
+        if ($member->status !== 'active') {
             throw new \Exception('Membership is blocked.', 403);
         }
 
-        $book = Book::where('book_id', $data['book_id'])->where('status', 'available')->first();
-        if (!$book) {
-            throw new ModelNotFoundException('Book not found.');
-        }
-
+        $book = Book::where('book_id', $data['book_id'])
+            ->where('status', 'available')
+            ->firstOrFail();
         if ($book->available_copies <= 0) {
             throw new \Exception('No available copies.', 400);
         }
 
         return DB::transaction(function () use ($member, $book) {
-
-            $borrowDate = now();
-            $dueDate = now()->addDays(7);
-
             $transaction = BorrowTransaction::create([
-                'id' => $member->id,
+                'user_id' => $member->id,
                 'book_id' => $book->book_id,
-                'borrow_date' => $borrowDate,
-                'due_date' => $dueDate,
+                'borrow_date' => now(),
+                'due_date' => now()->addDays(7),
                 'status' => 'borrowed'
             ]);
 
             $book->decrement('available_copies');
-
             return $transaction;
         });
     }
-
-    //Return Book
 
     public function returnBook($transactionId)
     {
@@ -101,7 +87,7 @@ class BorrowTransactionService
                 ]);
             }
 
-            $transaction->book->increment('available_copies');
+            Book::where('book_id', $transaction->book_id)->increment('available_copies');
 
             return [
                 'transaction_id' => $transaction->transaction_id,
@@ -111,26 +97,26 @@ class BorrowTransactionService
             ];
         });
     }
-
-    // Member Transactions
-
-    public function getBorrowTransactionsByMemberId($userId)
+    public function getBorrowTransactionsByMemberId($userId = null)
     {
-        return BorrowTransaction::with(['book', 'member'])
-            ->where('id', $userId)
-            ->get()
-            ->map(function ($t) {
-                return [
-                    'transaction_id' => $t->transaction_id,
-                    'book' => $t->book,
-                    'borrow_date' => $t->borrow_date,
-                    'due_date' => $t->due_date,
-                    'return_date' => $t->return_date,
-                    'status' => $t->status,
-                    'fine_amount' => $t->fine_amount,
-                    'student_name' => $t->member->full_name,
-                    'student_department' => $t->member->department
-                ];
-            });
+        $query = BorrowTransaction::with(['book', 'member', 'fine']);
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get()->map(function ($t) {
+            return [
+                'transaction_id' => $t->transaction_id,
+                'book' => $t->book,
+                'borrow_date' => $t->borrow_date,
+                'due_date' => $t->due_date,
+                'return_date' => $t->return_date,
+                'status' => $t->status,
+                'fine' => $t->fine,
+                'full_name' => $t->member?->full_name,
+                'department' => $t->member?->department
+            ];
+        });
     }
 }

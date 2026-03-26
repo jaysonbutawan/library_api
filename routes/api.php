@@ -34,17 +34,17 @@ Route::get('/test', function () {
         Route::prefix('transactions')->name('transactions.')->group(function () {
             Route::post('/borrow', [BorrowTransactionController::class, 'borrow'])->name('borrow');
             Route::post('/{transactionId}', [BorrowTransactionController::class, 'returnBook'])->name('returnBook');
-            Route::get('/{memberId}', [BorrowTransactionController::class, 'getBorrowTransactionsByMemberId'])->name('getBorrowTransactionsByMemberId');
+            Route::get('/{userId?}', [BorrowTransactionController::class, 'getBorrowTransactionsByMemberId'])->name('getBorrowTransactionsByMemberId');
         });
 
         Route::prefix('fines')->name('fines.')->group(function () {
             Route::get('/choice', [FinesController::class, 'finesChoice'])->name('finesChoice');
             Route::post('/pay/{fineId}', [FinesController::class, 'payFine'])->name('payFine');
-            Route::get('/{memberId}', [FinesController::class, 'memberFines'])->name('memberFines');
+            Route::get('/{userId}', [FinesController::class, 'memberFines'])->name('memberFines');
             Route::get('/unpaid', [FinesController::class, 'unpaidFines'])->name('unpaidFines');
         });
 
-        Route::get('/clearance/{memberId}',[ClearanceController::class, 'check'])->name('clearance.check');
+        Route::get('/clearance/{userId}',[ClearanceController::class, 'check'])->name('clearance.check');
 
         Route::prefix('staff')->name('staff.')->group(function () {
             Route::get('/{id?}', [LibraryStaffController::class, 'show'])->name('show');

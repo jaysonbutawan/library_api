@@ -21,26 +21,19 @@ class UpdateBookRequest extends FormRequest
                 'sometimes',
                 'nullable',
                 'string',
-                Rule::unique('books', 'isbn')
-                    ->ignore($bookId, 'book_id')
+                Rule::unique('books', 'isbn')->ignore($bookId, 'book_id')
             ],
 
-            'title' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('books')
-                    ->where(function ($query) {
-                        return $query->where('isbn', $this->isbn);
-                    })
-                    ->ignore($bookId, 'book_id')
+            'title' => ['sometimes','required','string','max:255',
+                        Rule::unique('books', 'title')->ignore($bookId, 'book_id')
             ],
 
             'author' => ['sometimes', 'required', 'string', 'max:255'],
             'category' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'publication_year' => ['sometimes', 'nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'total_copies' => ['sometimes', 'required', 'integer', 'min:1'],
             'available_copies' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'status' => ['sometimes', 'nullable', 'string', 'in:available,borrowed,unavailable,maintenance'],
         ];
     }
 
@@ -48,10 +41,11 @@ class UpdateBookRequest extends FormRequest
     {
         return [
             'title.required' => 'Title cannot be empty.',
+            'title.unique' => 'This title already exists.',
             'author.required' => 'Author cannot be empty.',
             'total_copies.min' => 'Total copies must be at least 1.',
             'isbn.unique' => 'This ISBN already exists.',
-            'title.unique' => 'A book with this title and ISBN already exists.'
+            'publication_year.integer' => 'Publication year must be a valid year.',
         ];
     }
 }

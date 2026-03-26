@@ -11,13 +11,13 @@ class BorrowTransaction extends Model
     protected $primaryKey = 'transaction_id';
 
     protected $fillable = [
-        'id',
+        'user_id',
         'book_id',
         'borrow_date',
         'due_date',
         'return_date',
         'status',
-        ];
+    ];
 
     public $timestamps = false;
 

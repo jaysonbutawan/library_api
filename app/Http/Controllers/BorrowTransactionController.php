@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Services\BorrowTransactionService;
 use App\Http\Requests\BorrowBookRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 
 class BorrowTransactionController extends Controller
 {
@@ -30,35 +31,40 @@ class BorrowTransactionController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         } catch (\Exception $e) {
+            $code = (int) $e->getCode();
+            $status = ($code >= 400 && $code < 600) ? $code : 500;
+
             return response()->json([
                 'message' => $e->getMessage()
-            ], $e->getCode() ?: 500);
+            ], $status);
         }
     }
 
-    public function return($transactionId)
+    public function returnBook($transactionId)
     {
         try {
             $result = $this->service->returnBook($transactionId);
 
             return response()->json([
                 'message' => 'Book returned successfully.',
-                'fine_amount' => $result['fine'],
-                'data' => $result['transaction']
+                'data' => $result
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
         } catch (\Exception $e) {
+            $code = (int) $e->getCode();
+            $status = ($code >= 400 && $code < 600) ? $code : 500;
+
             return response()->json([
                 'message' => $e->getMessage()
-            ], $e->getCode() ?: 500);
+            ], $status);
         }
     }
 
-    public function getBorrowTransactionsByMemberId($memberId)
+    public function getBorrowTransactionsByMemberId(Request $request, $userId = null)
     {
         return response()->json(
-            $this->service->getBorrowTransactionsByMemberId($memberId)
+            $this->service->getBorrowTransactionsByMemberId($userId)
         );
     }
 }
