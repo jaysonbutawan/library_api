@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Services\BorrowTransactionService;
 use App\Http\Requests\BorrowBookRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 
 class BorrowTransactionController extends Controller
@@ -17,54 +18,244 @@ class BorrowTransactionController extends Controller
         $this->service = $service;
     }
 
-    public function borrow(BorrowBookRequest $request)
+    /**
+     * Step 1: Student requests a book
+     * POST /api/borrow-requests
+     */
+    public function requestBook(BorrowBookRequest $request)
     {
         try {
-            $transaction = $this->service->borrow(
-                $request->validated()
-            );
+            $result = $this->service->requestBook($request->validated());
 
             return response()->json([
-                'message' => 'Book borrowed successfully.',
-                'data' => $transaction
+                'message' => $result['message'],
+                'data' => [
+                    'request_id' => $result['request_id'],
+                    'queue_position' => $result['queue_position'],
+                    'book_title' => $result['book_title'],
+                ]
             ], 201);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             $code = (int) $e->getCode();
             $status = ($code >= 400 && $code < 600) ? $code : 500;
 
-            return response()->json([
-                'message' => $e->getMessage()
-            ], $status);
+            return response()->json(['message' => $e->getMessage()], $status);
         }
     }
 
+    /**
+     * Step 2: Librarian approves a request
+     * PATCH /api/borrow-requests/{requestId}/approve
+     */
+    public function approveRequest($requestId)
+    {
+        try {
+            $result = $this->service->approveRequest($requestId);
+
+            return response()->json([
+                'message' => $result['message'],
+                'data' => [
+                    'request_id' => $result['request_id'],
+                    'status' => $result['status'],
+                    'expires_at' => $result['expires_at'],
+                ]
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    
+
+    /**
+     * Step 3: Librarian completes the borrow (student picks up)
+     * POST /api/borrow-requests/{requestId}/complete
+     */
+    public function completeBorrow($requestId)
+    {
+        try {
+            $dueDateDays = request()->input('due_date_days', 7);
+            $result = $this->service->completeBorrow($requestId, $dueDateDays);
+
+            return response()->json([
+                'message' => $result['message'],
+                'data' => [
+                    'transaction_id' => $result['transaction_id'],
+                    'request_id' => $result['request_id'],
+                    'borrow_date' => $result['borrow_date'],
+                    'due_date' => $result['due_date'],
+                ]
+            ], 201);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Return a borrowed book
+     * POST /api/borrow-transactions/{transactionId}/return
+     */
     public function returnBook($transactionId)
     {
         try {
             $result = $this->service->returnBook($transactionId);
 
             return response()->json([
-                'message' => 'Book returned successfully.',
-                'data' => $result
-            ]);
+                'message' => $result['message'],
+                'data' => [
+                    'transaction_id' => $result['transaction_id'],
+                    'status' => $result['status'],
+                    'return_date' => $result['return_date'],
+                    'days_overdue' => $result['days_overdue'],
+                    'fine_amount' => $result['fine_amount'],
+                    'fine_paid' => $result['fine_paid'],
+                ]
+            ], 200);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
         } catch (\Exception $e) {
-            $code = (int) $e->getCode();
-            $status = ($code >= 400 && $code < 600) ? $code : 500;
-
-            return response()->json([
-                'message' => $e->getMessage()
-            ], $status);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
-    public function getBorrowTransactionsByMemberId(Request $request, $userId = null)
+    /**
+     * Cancel a borrow request
+     * DELETE /api/borrow-requests/{requestId}
+     */
+    public function cancelRequest($requestId)
     {
-        return response()->json(
-            $this->service->getBorrowTransactionsByMemberId($userId)
-        );
+        try {
+            $result = $this->service->cancelRequest($requestId);
+
+            return response()->json([
+                'message' => $result['message'],
+                'data' => [
+                    'request_id' => $result['request_id'],
+                    'status' => $result['status'],
+                ]
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get queue status for a specific book
+     * GET /api/books/{bookId}/queue
+     */
+    public function getBookQueue($bookId)
+    {
+        try {
+            $queueStatus = $this->service->getBookQueue($bookId);
+
+            return response()->json([
+                'message' => 'Queue status retrieved.',
+                'data' => $queueStatus
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get all borrow requests for a user
+     * GET /api/users/{userId}/requests
+     */
+    public function getUserRequests($userId = null)
+    {
+        try {
+            $requests = $this->service->getUserRequests($userId);
+
+            return response()->json([
+                'message' => $userId ? 'User requests retrieved.' : 'All requests retrieved.',
+                'data' => $requests,
+                'count' => count($requests)
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get borrow transactions (with optional user filter)
+     * GET /api/borrow-transactions?user_id={userId}
+     */
+    public function getBorrowTransactions(Request $request)
+    {
+        try {
+            $userId = $request->query('user_id');
+            $transactions = $this->service->getBorrowTransactionsByMemberId($userId);
+
+            return response()->json([
+                'message' => 'Borrow transactions retrieved.',
+                'data' => $transactions
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get borrow transactions for a specific user
+     * GET /api/users/{userId}/transactions
+     */
+    public function getUserTransactions($userId)
+    {
+        try {
+            $transactions = $this->service->getBorrowTransactionsByMemberId($userId);
+
+            return response()->json([
+                'message' => 'User transactions retrieved.',
+                'data' => $transactions
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Pay fine for overdue book
+     * POST /api/borrow-transactions/{transactionId}/pay-fine
+     */
+    public function payFine($transactionId)
+    {
+        try {
+            $result = $this->service->payFine($transactionId);
+
+            return response()->json([
+                'message' => $result['message'],
+                'data' => [
+                    'transaction_id' => $result['transaction_id'],
+                    'fine_amount' => $result['fine_amount'],
+                    'fine_paid' => $result['fine_paid'],
+                ]
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 }
