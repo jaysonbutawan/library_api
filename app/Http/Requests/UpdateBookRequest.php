@@ -32,7 +32,7 @@ class UpdateBookRequest extends FormRequest
             'category_id' => ['sometimes', 'integer', 'exists:categories,category_id'],
             'publication_year' => ['sometimes', 'nullable', 'integer', 'min:1000', 'max:' . date('Y')],
             'total_copies' => ['sometimes', 'required', 'integer', 'min:1'],
-            'available_copies' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'available_copies' => ['sometimes', 'nullable', 'integer', 'min:0', 'lte:total_copies'],
             'status' => ['sometimes', 'nullable', 'string', 'in:available,borrowed,unavailable,maintenance'],
         ];
     }
@@ -46,6 +46,7 @@ class UpdateBookRequest extends FormRequest
             'total_copies.min' => 'Total copies must be at least 1.',
             'isbn.unique' => 'This ISBN already exists.',
             'publication_year.integer' => 'Publication year must be a valid year.',
+            'available_copies.lte' => 'Available copies cannot exceed the total number of copies.',
         ];
     }
 }

@@ -5,101 +5,143 @@ namespace App\Http\Services;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\ConnectionException;
 
-class AuthService
+class StudentAuthService
 {
     protected string $admissionApiUrl;
     protected string $admissionApiToken;
 
     public function __construct()
     {
-        $this->admissionApiUrl = config('services.admission.url');
-        $this->admissionApiToken = config('services.admission.token');
+        $url   = config('services.admission.url');
+        $token = config('services.admission.token');
+
+        if (!$url || !$token) {
+            throw new \RuntimeException(
+                'Admission API is not configured. Check ADMISSION_API_URL and ADMISSION_API_TOKEN in .env'
+            );
+        }
+
+        $this->admissionApiUrl   = $url;
+        $this->admissionApiToken = $token;
     }
 
-    /**
-     * Login with admission system credentials
-     * Gets student data from admission API and syncs with library database
-     */
     public function login(array $credentials): array
     {
+        // ─── 1. Network / Unreachable ────────────────────────────────────────
         try {
-            // Call admission API to validate credentials
             $response = Http::withToken($this->admissionApiToken)
+                ->timeout(8)        // stop waiting after 8 seconds
+                ->connectTimeout(5) // stop connecting after 5 seconds
                 ->post("{$this->admissionApiUrl}/api/auth/login", $credentials);
 
-            if (!$response->successful()) {
-                Log::warning('Admission API login failed', [
-                    'status' => $response->status(),
-                    'response' => $response->json()
-                ]);
+        } catch (ConnectionException $e) {
+            // Server is down, DNS failure, refused connection, or timed out
+            Log::error('Admission API unreachable', [
+                'url'     => $this->admissionApiUrl,
+                'message' => $e->getMessage(),
+            ]);
 
-                return [
-                    'success' => false,
-                    'message' => 'Invalid credentials.',
-                ];
-            }
+            return [
+                'success'     => false,
+                'unavailable' => true,  // <-- flag the frontend can check
+                'message'     => 'The student portal is currently unreachable. Please try again later or contact support.',
+            ];
+        }
 
-            $studentData = $response->json();
+        // ─── 2. API responded but credentials are wrong (401 / 422) ─────────
+        if ($response->status() === 401 || $response->status() === 422) {
+            Log::warning('Admission API rejected credentials', [
+                'status' => $response->status(),
+            ]);
 
-            // Validate required fields
-            if (!isset($studentData['student_id'])) {
-                Log::error('Missing student_id in admission API response', $studentData);
+            return [
+                'success'     => false,
+                'unavailable' => false,
+                'message'     => 'Invalid email or password.',
+            ];
+        }
 
-                return [
-                    'success' => false,
-                    'message' => 'Invalid student data received.',
-                ];
-            }
+        // ─── 3. API responded with any other non-2xx (500, 503, etc.) ────────
+        if (!$response->successful()) {
+            Log::error('Admission API returned unexpected error', [
+                'status'   => $response->status(),
+                'response' => $response->body(),
+            ]);
 
-            // Create or update user in library system
+            return [
+                'success'     => false,
+                'unavailable' => true,
+                'message'     => 'The student portal returned an unexpected error. Please try again later.',
+            ];
+        }
+
+        // ─── 4. Parse and validate the response payload ───────────────────────
+        $studentData = $response->json();
+
+        if (!isset($studentData['student_id'])) {
+            Log::error('Missing student_id in admission API response', $studentData);
+
+            return [
+                'success'     => false,
+                'unavailable' => false,
+                'message'     => 'Invalid student data received from the portal.',
+            ];
+        }
+
+        // ─── 5. Sync student into local DB ────────────────────────────────────
+        try {
             $user = User::updateOrCreate(
                 ['student_id' => $studentData['student_id']],
                 [
-                    'full_name' => $studentData['full_name'] ?? $studentData['name'] ?? 'Unknown',
-                    'email' => $studentData['email'] ?? null,
-                    'department' => $studentData['department'] ?? null,
-                    'status' => 'active',
-                    'role' => 'student',
-                    'password' => null,
+                    'full_name'     => $studentData['full_name'] ?? $studentData['name'] ?? 'Unknown',
+                    'email'         => $studentData['email'] ?? null,
+                    'department'    => $studentData['department'] ?? null,
+                    'status'        => 'active',
+                    'role'          => 'student',
+                    'password'      => null,
                     'registered_at' => now(),
                 ]
             );
-
-            // Generate sanctum token for library API
-            $token = $user->createToken('library-token')->plainTextToken;
-
-            Log::info('Student login successful', [
-                'student_id' => $user->student_id,
-                'email' => $user->email
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Login successful.',
-                'user' => [
-                    'id' => $user->id,
-                    'student_id' => $user->student_id,
-                    'full_name' => $user->full_name,
-                    'email' => $user->email,
-                    'department' => $user->department,
-                    'status' => $user->status,
-                    'registered_at' => $user->registered_at,
-                ],
-                'token' => $token,
-            ];
         } catch (\Exception $e) {
-            Log::error('Login error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+            Log::error('Failed to sync student to local DB', [
+                'student_id' => $studentData['student_id'],
+                'message'    => $e->getMessage(),
             ]);
 
             return [
-                'success' => false,
-                'message' => 'An error occurred during login. Please try again.',
+                'success'     => false,
+                'unavailable' => false,
+                'message'     => 'Authentication succeeded but failed to create your session. Please try again.',
             ];
         }
+
+        // ─── 6. Issue Sanctum token ───────────────────────────────────────────
+        $token = $user->createToken('library-token')->plainTextToken;
+
+        Log::info('Student login successful', [
+            'student_id' => $user->student_id,
+            'email'      => $user->email,
+        ]);
+
+        return [
+            'success'     => true,
+            'unavailable' => false,
+            'message'     => 'Login successful.',
+            'user'        => [
+                'id'           => $user->id,
+                'student_id'   => $user->student_id,
+                'full_name'    => $user->full_name,
+                'email'        => $user->email,
+                'department'   => $user->department,
+                'status'       => $user->status,
+                'registered_at'=> $user->registered_at,
+            ],
+            'token' => $token,
+        ];
     }
+
 
     /**
      * Get student profile from library database

@@ -20,7 +20,6 @@ class StaffAuthService
             ];
         }
 
-        // 2. Eager Load Role (CRITICAL: This prevents the role from being NULL)
         $user = User::with('role')->where('email', $email)->first();
 
         // 3. Check if User Exists

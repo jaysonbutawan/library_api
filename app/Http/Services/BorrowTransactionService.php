@@ -377,6 +377,8 @@ class BorrowTransactionService
                 return [
                     'request_id' => $request->request_id,
                     'user_id' => $request->user_id,
+
+                    'full_name' => $request->user?->full_name,
                     'book' => [
                         'book_id' => $request->book->book_id,
                         'title' => $request->book->title,

@@ -30,6 +30,7 @@ class StoreBookRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:50'],
+            'publication_year' => ['nullable', 'year'],
             'category_id' => ['nullable', 'integer', 'exists:categories,category_id'],
             'total_copies' => ['required', 'integer', 'min:1'],
             'available_copies' => ['nullable', 'integer', 'min:0', 'lte:total_copies'],
