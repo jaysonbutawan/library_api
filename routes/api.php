@@ -16,13 +16,13 @@ Route::prefix('library')->group(function () {
 
     Route::prefix('auth')->group(function () {
         Route::post('/login',  [AuthController::class, 'login']);
+        Route::post('/test-login', [AuthController::class, 'testLogin']);
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
         });
     });
 
 
-    Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [AuthController::class, 'profile'])->name('student.profile');
         Route::post('/logout', [AuthController::class, 'logout'])->name('student.logout');
 
@@ -36,7 +36,7 @@ Route::prefix('library')->group(function () {
         Route::prefix('books')->name('books.')->group(function () {
             Route::get('/{id?}', [BooksController::class, 'index'])->name('index');
             Route::post('/', [BooksController::class, 'store'])->name('store');
-            Route::put('/{id}', [BooksController::class, 'update'])->name('update');
+            Route::patch('/{id}', [BooksController::class, 'update'])->name('update');
             Route::delete('/{id}', [BooksController::class, 'destroy'])->name('destroy');
         });
 
@@ -97,5 +97,4 @@ Route::prefix('library')->group(function () {
         });
 
         Route::get('/clearance/{userId}', [ClearanceController::class, 'check'])->name('clearance.check');
-    });
 });

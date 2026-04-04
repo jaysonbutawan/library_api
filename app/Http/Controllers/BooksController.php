@@ -7,6 +7,7 @@ use App\Http\Services\BookService;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 
 class BooksController extends Controller
 {
@@ -17,24 +18,24 @@ class BooksController extends Controller
         $this->bookService = $bookService;
     }
 
-    public function index($id = null)
+    public function index(Request $request, $id = null)
     {
         try {
-            $books = $this->bookService->getBooks($id);
+            $perPage = min($request->input('per_page', 10), 50);
 
-            if ($id !== null) {
-                if ($books->status !== 'available') {
-                    return response()->json([
-                        'message' => 'Book is currently unavailable'
-                    ], 404);
-                }
-            }
+            $result = $this->bookService->getBooks($id, $perPage);
 
-            return response()->json($books);
+            return response()->json($result);
         } catch (ModelNotFoundException $e) {
             return response()->json([
+                'success' => false,
                 'message' => 'Book not found'
             ], 404);
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400); // or 422 depending on case
         }
     }
 

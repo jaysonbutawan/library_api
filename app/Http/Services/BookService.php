@@ -8,8 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 class BookService
 {
-
-    public function create(array $data)
+    public function create(array $data): Book
     {
         if (empty($data['isbn'])) {
             throw ValidationException::withMessages(['isbn' => ['Isbn is required.']]);
@@ -17,56 +16,91 @@ class BookService
 
         $data['available_copies'] =
             $data['available_copies'] ?? $data['total_copies'];
+
         if ($data['available_copies'] > $data['total_copies']) {
             throw ValidationException::withMessages([
                 'available_copies' => ['available_copies cannot be greater than total_copies.']
             ]);
         }
+
         return Book::create($data);
     }
 
-    public function getBooks($id = null)
-{
-    if ($id === null) {
-        return Book::with('category')->get();
-    }
-    return Book::with('category')->findOrFail($id);
-}
-
-
-    public function update($id, array $data)
+    public function getBooks($id = null, int $perPage = 10)
     {
-        $book = $this->getBooks($id);
-        if (!empty($data['isbn']) && $data['isbn'] !== $book->isbn) {
-            if (Book::where('isbn', $data['isbn'])->exists()) {
-                throw ValidationException::withMessages(['isbn' => ['This ISBN already exists.']]);
-            }
+        $query = Book::with('category');
+
+        // 🔍 SEARCH
+        if ($search = request('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('author', 'like', "%{$search}%")
+                    ->orWhere('isbn', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
+            });
         }
 
-        if (isset($data['total_copies']) && isset($data['available_copies'])) {
-            if ($data['available_copies'] > $data['total_copies']) {
-                throw ValidationException::withMessages([
-                    'available_copies' => ['Available copies cannot exceed total copies.']
-                ]);
-            }
-        } elseif (isset($data['total_copies']) && !isset($data['available_copies'])) {
-            if ($book->available_copies > $data['total_copies']) {
-                throw ValidationException::withMessages([
-                    'available_copies' => ['Available copies (' . $book->available_copies . ') cannot exceed new total copies (' . $data['total_copies'] . ').']
-                ]);
-            }
+        //  CATEGORY
+        if ($category = request('category')) {
+            $query->whereHas('category', function ($q) use ($category) {
+                $q->where('name', $category);
+            });
         }
+
+        // STATUS
+        if ($status = request('status')) {
+            $query->where('status', $status);
+        }
+
+        $query->orderBy('book_id');
+
+        // =========================
+        // SINGLE BOOK → RETURN MODEL
+        // =========================
+        if ($id !== null) {
+            $book = $query->where('book_id', $id)->firstOrFail();
+
+            if ($book->status !== 'available') {
+                throw new \DomainException('Book is currently unavailable');
+            }
+
+            return $book;
+        }
+
+        // =========================
+        // MULTIPLE → RETURN PAGINATOR (MODELS)
+        // =========================
+        return $query->cursorPaginate($perPage);
+    }
+    public function update($id, array $data): Book
+    {
+        // Use the dedicated method to avoid request filters
+        $book = $this->getBookById($id);
+
+        // Update the fields passed in $data
         $book->update($data);
+
         return $book;
     }
 
-    public function destroy($id)
+    public function getBookById($id): Book
+    {
+        // Fetch a book directly by its ID, no filters applied
+        return Book::findOrFail($id);
+    }
+
+    public function destroy($id): Book
     {
         $book = Book::find($id);
+
         if (!$book) {
             throw new ModelNotFoundException('Book not found.');
         }
+
         $book->update(['status' => 'unavailable']);
+
         return $book;
     }
 }

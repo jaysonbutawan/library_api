@@ -12,8 +12,12 @@ class StudentAuthService
     protected string $admissionApiUrl;
     protected string $admissionApiToken;
 
-    public function __construct()
+    public function __construct(bool $isTest = false)
     {
+
+    if ($isTest) {
+        return; // Skip API check for test login
+    }
         $url   = config('services.admission.url');
         $token = config('services.admission.token');
 
@@ -35,7 +39,6 @@ class StudentAuthService
                 ->timeout(8)        // stop waiting after 8 seconds
                 ->connectTimeout(5) // stop connecting after 5 seconds
                 ->post("{$this->admissionApiUrl}/api/auth/login", $credentials);
-
         } catch (ConnectionException $e) {
             // Server is down, DNS failure, refused connection, or timed out
             Log::error('Admission API unreachable', [
@@ -136,7 +139,7 @@ class StudentAuthService
                 'email'        => $user->email,
                 'department'   => $user->department,
                 'status'       => $user->status,
-                'registered_at'=> $user->registered_at,
+                'registered_at' => $user->registered_at,
             ],
             'token' => $token,
         ];
@@ -376,4 +379,5 @@ class StudentAuthService
             ];
         }
     }
+
 }

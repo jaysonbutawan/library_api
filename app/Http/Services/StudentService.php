@@ -27,7 +27,8 @@ class StudentService
         if ($search = request('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('full_name', 'like', "%{$search}%")
-                  ->orWhere('student_id', 'like', "%{$search}%");
+                  ->orWhere('student_id', 'like', "%{$search}%")
+                  ->orWhere('department', 'like', "%{$search}%");
             });
         }
 

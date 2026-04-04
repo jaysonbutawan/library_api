@@ -6,12 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Services\StaffAuthService;
 use App\Http\Services\StudentAuthService;
+use App\Http\Services\TestStudentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
-     public function login(LoginRequest $request): JsonResponse
+    public function testLogin()
+    {
+        // ✅ Instantiate without parameter
+        $service = new TestStudentService();
+        return response()->json($service->testLogin());
+    }
+
+
+    public function login(LoginRequest $request): JsonResponse
     {
         $type = $request->input('type');
 
