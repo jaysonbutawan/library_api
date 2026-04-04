@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamp('requested_at')->useCurrent();
             $table->timestamp('approved_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
-            $table->timestamp('expires_at')->nullable(); // 7 days from approval, then auto-cancel
+            $table->timestamp('expires_at')->nullable();
 
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')

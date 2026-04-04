@@ -13,10 +13,7 @@ use Carbon\Carbon;
 
 class BorrowTransactionService
 {
-    /**
-     * Step 1: Student requests a book (adds to queue)
-     * Returns queue position
-     */
+
     public function requestBook(array $data)
     {
         $member = User::findOrFail($data['user_id']);
@@ -27,7 +24,6 @@ class BorrowTransactionService
 
         $book = Book::findOrFail($data['book_id']);
 
-        // Check if user already has a pending request for this book
         $existingRequest = BorrowRequest::where('user_id', $member->id)
             ->where('book_id', $book->book_id)
             ->where('status', 'pending')
@@ -39,7 +35,6 @@ class BorrowTransactionService
             ]);
         }
 
-        // Check if user already borrowed this book and hasn't returned it
         $activeBorrow = BorrowTransaction::where('user_id', $member->id)
             ->where('book_id', $book->book_id)
             ->where('status', 'borrowed')
@@ -90,14 +85,12 @@ class BorrowTransactionService
 
         $book = Book::findOrFail($request->book_id);
 
-        // Check if book has available copies
         if ($book->available_copies <= 0) {
             throw ValidationException::withMessages([
                 'available_copies' => ['No copies available at this moment.']
             ]);
         }
 
-        // Check if this request is next in queue FOR THIS SPECIFIC BOOK
         $nextInQueue = BorrowRequest::where('book_id', $request->book_id)
             ->where('status', 'pending')
             ->orderBy('queue_position')
@@ -109,7 +102,6 @@ class BorrowTransactionService
             ]);
         }
 
-        // ✅ FIX: Cast both to int for comparison
         if ((int)$nextInQueue->request_id !== (int)$requestId) {
             $position = $request->queue_position;
             throw ValidationException::withMessages([
@@ -117,23 +109,55 @@ class BorrowTransactionService
             ]);
         }
 
-        return DB::transaction(function () use ($request) {
-            $request->approve();
+        // Validate pickup_days from the request payload
+        $pickupDays = request()->input('pickup_days');
+
+        if (!$pickupDays || !is_numeric($pickupDays) || (int)$pickupDays < 1 || (int)$pickupDays > 30) {
+            throw ValidationException::withMessages([
+                'pickup_days' => ['Pickup days must be between 1 and 30.']
+            ]);
+        }
+
+        return DB::transaction(function () use ($request, $pickupDays) {
+            $request->approve((int)$pickupDays);
 
             return [
                 'request_id' => $request->request_id,
-                'status' => 'approved',
+                'status'     => 'approved',
                 'expires_at' => $request->expires_at,
-                'message' => 'Request approved! Student has 7 days to pick up the book.',
+                'message'    => "Request approved! Student has {$pickupDays} day(s) to pick up the book.",
             ];
         });
     }
 
     /**
+     * Step: Librarian rejects a student's request
+     */
+    public function rejectRequest($requestId)
+    {
+        $request = BorrowRequest::findOrFail($requestId);
+
+        return DB::transaction(function () use ($request) {
+            // Mark the request as rejected
+            $request->update([
+                'status' => 'cancelled',
+            ]);
+
+            // Promote the next pending request in queue
+            $this->promoteNextInQueue($request->book_id);
+
+            return [
+                'request_id' => $request->request_id,
+                'status' => $request->status,
+                'message' => 'Request has been cancelled (rejected).',
+            ];
+        });
+    }
+    /**
      * Step 3: Student picks up the book (librarian completes the borrow)
      * This creates the transaction and decrements available_copies
      */
-    public function completeBorrow($requestId, $dueDateDays = 7)
+    public function completeBorrow($requestId, $dueDateDays)
     {
         $request = BorrowRequest::with('book')->findOrFail($requestId);
 
@@ -149,6 +173,11 @@ class BorrowTransactionService
         if ($book->available_copies <= 0) {
             throw ValidationException::withMessages([
                 'available_copies' => ['No copies available. Cannot complete borrow.']
+            ]);
+        }
+        if ($request->expires_at && now()->greaterThan($request->expires_at)) {
+            throw ValidationException::withMessages([
+                'status' => ['Reservation has expired.']
             ]);
         }
 

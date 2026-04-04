@@ -55,6 +55,9 @@ Route::prefix('library')->group(function () {
 
             Route::patch('/requests/{requestId}/approve', [BorrowTransactionController::class, 'approveRequest'])
                 ->name('approveRequest');
+
+            Route::patch('/requests/{requestId}/reject', [BorrowTransactionController::class, 'rejectRequest'])
+                ->name('rejectRequest');
             Route::patch('/requests/{requestId}/expire', [BorrowTransactionController::class, 'expireRequest'])
                 ->name('expireRequest');
 

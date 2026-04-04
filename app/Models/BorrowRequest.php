@@ -120,12 +120,12 @@ class BorrowRequest extends Model
      * Helper methods
      */
 
-    public function approve(): void
+    public function approve($pickupdays): void
     {
         $this->update([
             'status' => 'approved',
             'approved_at' => Carbon::now(),
-            'expires_at' => Carbon::now()->addDays(7),
+            'expires_at' => Carbon::now()->addDays($pickupdays),
         ]);
     }
 

@@ -73,7 +73,28 @@ class BorrowTransactionController extends Controller
         }
     }
 
-    
+    public function rejectRequest($requestId)
+    {
+        try {
+            $result = $this->service->rejectRequest($requestId);
+
+            return response()->json([
+                'message' => $result['message'],
+                'data' => [
+                    'request_id' => $result['request_id'],
+                    'status' => $result['status'],
+                ]
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        } catch (ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+
 
     /**
      * Step 3: Librarian completes the borrow (student picks up)
