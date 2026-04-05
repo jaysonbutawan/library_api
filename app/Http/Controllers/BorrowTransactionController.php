@@ -103,7 +103,13 @@ class BorrowTransactionController extends Controller
     public function completeBorrow($requestId)
     {
         try {
-            $dueDateDays = request()->input('due_date_days', 7);
+            $dueDateDays = request()->input('due_days');
+
+            if (!$dueDateDays || !is_numeric($dueDateDays) || $dueDateDays < 1 || $dueDateDays > 30) {
+                throw ValidationException::withMessages([
+                    'due_days' => ['Due date must be a number between 1 and 30.']
+                ]);
+            }
             $result = $this->service->completeBorrow($requestId, $dueDateDays);
 
             return response()->json([
@@ -202,32 +208,31 @@ class BorrowTransactionController extends Controller
      * Get all borrow requests for a user
      * GET /api/users/{userId}/requests
      */
-  public function getUserRequests(Request $request, $userId = null)
-{
-    try {
-        $perPage = min($request->input('per_page', 10), 50);
+    public function getUserRequests(Request $request, $userId = null)
+    {
+        try {
+            $perPage = min($request->input('per_page', 10), 50);
 
-        $requests = $this->service->getUserRequests($userId, $perPage);
+            $requests = $this->service->getUserRequests($userId, $perPage);
 
-        return response()->json([
-            'message' => $userId
-                ? 'User requests retrieved.'
-                : 'All requests retrieved.',
+            return response()->json([
+                'message' => $userId
+                    ? 'User requests retrieved.'
+                    : 'All requests retrieved.',
 
-            // ✅ FLATTEN RESPONSE (VERY IMPORTANT)
-            'data' => $requests['data'],
-            'meta' => $requests['meta'],
+                // ✅ FLATTEN RESPONSE (VERY IMPORTANT)
+                'data' => $requests['data'],
+                'meta' => $requests['meta'],
 
-            // ✅ Correct count
-            'count' => count($requests['data']),
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => $e->getMessage()
-        ], 500);
+                // ✅ Correct count
+                'count' => count($requests['data']),
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
-}
     /**
      * Get borrow transactions (with optional user filter)
      * GET /api/borrow-transactions?user_id={userId}
@@ -251,10 +256,11 @@ class BorrowTransactionController extends Controller
      * Get borrow transactions for a specific user
      * GET /api/users/{userId}/transactions
      */
-    public function getUserTransactions($userId)
+    public function getUserTransactions(Request $request, $userId)
     {
         try {
-            $transactions = $this->service->getBorrowTransactionsByMemberId($userId);
+             $perPage = min($request->input('per_page', 10), 50);
+            $transactions = $this->service->getBorrowTransactionsByMemberId($userId, $perPage);
 
             return response()->json([
                 'message' => 'User transactions retrieved.',

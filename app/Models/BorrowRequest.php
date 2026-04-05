@@ -128,6 +128,13 @@ class BorrowRequest extends Model
             'expires_at' => Carbon::now()->addDays($pickupdays),
         ]);
     }
+    public function reject(): void
+    {
+        $this->update([
+            'status' => 'rejected',
+            'cancelled_at' => Carbon::now(),
+        ]);
+    }
 
     public function cancel(): void
     {

@@ -7,10 +7,9 @@ use App\Models\BorrowTransaction;
 use App\Models\BorrowRequest;
 use App\Models\Book;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
-
 class BorrowTransactionService
 {
 
@@ -139,10 +138,7 @@ class BorrowTransactionService
 
         return DB::transaction(function () use ($request) {
             // Mark the request as rejected
-            $request->update([
-                'status' => 'cancelled',
-            ]);
-
+            $request->reject();
             // Promote the next pending request in queue
             $this->promoteNextInQueue($request->book_id);
 
@@ -305,12 +301,8 @@ class BorrowTransactionService
             ->where('status', 'pending')
             ->orderBy('queue_position')
             ->first();
-
         if ($nextRequest) {
-            $nextRequest->approve();
-
-            // TODO: Send notification to student (email, SMS, in-app)
-            // Example: Notification::send($nextRequest->user, new BookReadyNotification($nextRequest));
+            Log::info("User {$nextRequest->user_id} is now first in queue for book {$bookId}");
         }
     }
 
@@ -362,35 +354,50 @@ class BorrowTransactionService
     /**
      * Get borrow transactions with optional user filter
      */
-    public function getBorrowTransactionsByMemberId($userId = null)
-    {
-        $query = BorrowTransaction::with(['book', 'user', 'request']);
-
-        if ($userId) {
-            $query->where('user_id', $userId);
+public function getBorrowTransactionsByMemberId($userId = null, int $perPage = 10)
+{
+    $query = BorrowTransaction::with(['book', 'user', 'request']);
+    if ($userId) {$query->where('user_id', $userId); }
+    if ($status = request('status')) {
+        if ($status !== 'all') {
+            $query->where('status', $status);
         }
+    }
 
-        return $query->get()->map(function ($transaction) {
+    $query->orderBy('transaction_id');
+
+    $transactions = $query->cursorPaginate($perPage);
+
+    return [
+        'data' => collect($transactions->items())->map(function ($transaction) {
             return [
                 'transaction_id' => $transaction->transaction_id,
                 'request_id' => $transaction->request_id,
+
                 'book' => [
                     'book_id' => $transaction->book->book_id,
                     'title' => $transaction->book->title,
                     'author' => $transaction->book->author,
                 ],
+
                 'borrow_date' => $transaction->borrow_date,
                 'due_date' => $transaction->due_date,
                 'return_date' => $transaction->return_date,
+
                 'status' => $transaction->status,
                 'days_overdue' => $transaction->days_overdue,
-                'fine_amount' => $transaction->fine_amount,
+                'amount' => $transaction->amount,
                 'fine_paid' => $transaction->fine_paid,
-                'user_name' => $transaction->user->name ?? $transaction->user->full_name,
-                'user_id' => $transaction->user_id,
             ];
-        });
-    }
+        }),
+
+        'meta' => [
+            'next_cursor' => optional($transactions->nextCursor())->encode(),
+            'prev_cursor' => optional($transactions->previousCursor())->encode(),
+            'per_page' => $transactions->perPage(),
+        ],
+    ];
+}
 
     /**
      * Get all pending requests for a user
