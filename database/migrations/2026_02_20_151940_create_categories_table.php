@@ -11,8 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('books', function (Blueprint $table) {
-           $table->year('publication_year')->nullable()->after('author');
+         Schema::create('categories', function (Blueprint $table) {
+            $table->id('category_id');
+            $table->string('name', 100)->unique();
+            $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
         });
     }
 
@@ -21,8 +24,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('books', function (Blueprint $table) {
-            $table->dropColumn('publication_year');
-        });
+        Schema::dropIfExists('categories');
     }
 };
+ 

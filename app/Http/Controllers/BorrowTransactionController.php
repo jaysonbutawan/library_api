@@ -202,21 +202,32 @@ class BorrowTransactionController extends Controller
      * Get all borrow requests for a user
      * GET /api/users/{userId}/requests
      */
-    public function getUserRequests($userId = null)
-    {
-        try {
-            $requests = $this->service->getUserRequests($userId);
+  public function getUserRequests(Request $request, $userId = null)
+{
+    try {
+        $perPage = min($request->input('per_page', 10), 50);
 
-            return response()->json([
-                'message' => $userId ? 'User requests retrieved.' : 'All requests retrieved.',
-                'data' => $requests,
-                'count' => count($requests)
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
+        $requests = $this->service->getUserRequests($userId, $perPage);
+
+        return response()->json([
+            'message' => $userId
+                ? 'User requests retrieved.'
+                : 'All requests retrieved.',
+
+            // ✅ FLATTEN RESPONSE (VERY IMPORTANT)
+            'data' => $requests['data'],
+            'meta' => $requests['meta'],
+
+            // ✅ Correct count
+            'count' => count($requests['data']),
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => $e->getMessage()
+        ], 500);
     }
-
+}
     /**
      * Get borrow transactions (with optional user filter)
      * GET /api/borrow-transactions?user_id={userId}

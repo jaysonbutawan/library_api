@@ -17,12 +17,8 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('book_id');
 
-            // Status: pending (waiting) -> approved (ready to pick up) -> cancelled (rejected/expired)
-            $table->enum('status', ['pending', 'approved', 'cancelled', 'expired'])
-                ->default('pending')
-                ->index();
+            $table->string('status', 20)->default('pending');
 
-            // Queue position - auto-incremented per book to track order
             $table->integer('queue_position')->nullable();
 
             $table->timestamp('requested_at')->useCurrent();

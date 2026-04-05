@@ -181,6 +181,7 @@ class BorrowTransactionService
             ]);
         }
 
+
         return DB::transaction(function () use ($request, $book, $dueDateDays) {
             // Create the actual borrow transaction
             $transaction = BorrowTransaction::create([
@@ -192,10 +193,14 @@ class BorrowTransactionService
                 'status' => 'borrowed',
             ]);
 
-            // DECREMENT available_copies
+            $request->update([
+                'status' => 'completed',
+            ]);
+
+            // ✅ Decrement copies
             $book->decrement('available_copies');
 
-            // Auto-promote next in queue if there is one
+            // ✅ Promote next queue
             $this->promoteNextInQueue($book->book_id);
 
             return [
@@ -390,38 +395,104 @@ class BorrowTransactionService
     /**
      * Get all pending requests for a user
      */
-    public function getUserRequests($userId = null)
+    public function getUserRequests($userId = null, int $perPage = 10)
     {
-        $query = BorrowRequest::with('book');
+        $query = BorrowRequest::with(['book', 'user']);
 
-        // If userId is provided, filter by that user
+        // =========================
+        // 👤 USER FILTER
+        // =========================
         if ($userId !== null) {
             $query->where('user_id', $userId);
         }
 
-        return $query
-            ->orderByDesc('requested_at')
-            ->get()
-            ->map(function ($request) {
+        // =========================
+        // 🔍 SEARCH FILTER
+        // =========================
+        if ($search = request('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($uq) use ($search) {
+                    $uq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('student_id', 'like', "%{$search}%");
+                })
+                    ->orWhereHas('book', function ($bq) use ($search) {
+                        $bq->where('title', 'like', "%{$search}%")
+                            ->orWhere('author', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // =========================
+        // 📌 STATUS FILTER
+        // =========================
+        if ($status = request('status')) {
+            if ($status !== 'all') {
+                $query->where('status', $status);
+            }
+        }
+
+        // =========================
+        // ⏳ EXPIRATION FILTER
+        // =========================
+        if ($expired = request('expired')) {
+            if ($expired === 'true') {
+                $query->whereNotNull('expires_at')
+                    ->where('expires_at', '<', now());
+            }
+
+            if ($expired === 'false') {
+                $query->where(function ($q) {
+                    $q->whereNull('expires_at')
+                        ->orWhere('expires_at', '>=', now());
+                });
+            }
+        }
+
+        // =========================
+        // ⚠️ REQUIRED ORDERING
+        // =========================
+        $query->orderByDesc('requested_at')
+            ->orderByDesc('request_id'); // prevents duplicate cursor issue
+
+        // =========================
+        // CURSOR PAGINATION
+        // =========================
+        $requests = $query->cursorPaginate($perPage);
+
+        return [
+            'data' => collect($requests->items())->map(function ($request) {
                 return [
                     'request_id' => $request->request_id,
                     'user_id' => $request->user_id,
-
+                    'student_id' => $request->user?->student_id,
                     'full_name' => $request->user?->full_name,
-                    'book' => [
+
+                    'book' => $request->book ? [
                         'book_id' => $request->book->book_id,
                         'title' => $request->book->title,
                         'author' => $request->book->author,
-                    ],
+                    ] : null,
+
                     'status' => $request->status,
                     'queue_position' => $request->queue_position,
                     'requested_at' => $request->requested_at,
                     'approved_at' => $request->approved_at,
                     'expires_at' => $request->expires_at,
-                    'days_remaining' => $request->status === 'approved' ? $request->daysUntilExpiry() : null,
+
+                    'days_remaining' => $request->status === 'approved'
+                        ? $request->daysUntilExpiry()
+                        : null,
+
                     'is_expired' => $request->hasExpired(),
                 ];
-            });
+            }),
+
+            'meta' => [
+                'next_cursor' => optional($requests->nextCursor())->encode(),
+                'prev_cursor' => optional($requests->previousCursor())->encode(),
+                'per_page' => $requests->perPage(),
+            ],
+        ];
     }
 
     /**

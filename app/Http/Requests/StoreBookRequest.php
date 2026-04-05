@@ -39,6 +39,7 @@ class StoreBookRequest extends FormRequest
             'publication_year' => [
                 'nullable',
                 'integer',
+                'digits:4',
                 'min:1000',
                 'max:' . now()->year  // Can't be future year
             ],
@@ -66,7 +67,7 @@ class StoreBookRequest extends FormRequest
     {
         return [
             'isbn.required' => 'ISBN is required.',
-            'isbn.unique' => 'This ISBN already exists in the system.',
+            'isbn.unique' => 'Please provide a unique ISBN.',
             'isbn.string' => 'ISBN must be a valid string.',
 
             'title.required' => 'Title is required.',
@@ -81,6 +82,7 @@ class StoreBookRequest extends FormRequest
             'publication_year.integer' => 'Publication year must be a valid year.',
             'publication_year.min' => 'Publication year must be 1000 or later.',
             'publication_year.max' => 'Publication year cannot be in the future.',
+            'publication_year.digits' => 'Publication year must be a 4-digit year.',
 
             'category_id.exists' => 'Selected category does not exist.',
             'category_id.integer' => 'Category ID must be a number.',
