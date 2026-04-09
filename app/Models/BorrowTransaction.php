@@ -141,30 +141,33 @@ class BorrowTransaction extends Model
      * Helper methods
      */
 
-    public function markAsOverdue(): void
-    {
-        $daysOverdue = Carbon::now()->diffInDays($this->due_date, false);
+   public function markAsOverdue(int $finePerDay = 0): void
+{
+    $daysOverdue = Carbon::now()->startOfDay()
+        ->diffInDays(Carbon::parse($this->due_date)->startOfDay());
 
-        $this->update([
-            'status' => 'overdue',
-            'days_overdue' => max(0, $daysOverdue),
-            'fine_amount' => max(0, $daysOverdue * 10), // 10 per day
-        ]);
-    }
+    $this->update([
+        'status' => 'overdue',
+        'days_overdue' => $daysOverdue,
+        'fine_amount' => $daysOverdue * $finePerDay,
+    ]);
+}
 
-    public function completeReturn(Carbon $returnDate = null): void
-    {
-        $returnDate = $returnDate ?? Carbon::now();
-        $daysOverdue = $returnDate->diffInDays($this->due_date, false);
-        $isOverdue = $daysOverdue > 0;
+public function completeReturn(?Carbon $returnDate = null, int $finePerDay = 0): void
+{
+    $returnDate = ($returnDate ?? Carbon::now())->startOfDay();
+    $dueDate = Carbon::parse($this->due_date)->startOfDay();
 
-        $this->update([
-            'return_date' => $returnDate->toDateString(),
-            'status' => $isOverdue ? 'overdue' : 'returned',
-            'days_overdue' => max(0, $daysOverdue),
-            'fine_amount' => $isOverdue ? $daysOverdue * 10 : null,
-        ]);
-    }
+    $isOverdue = $returnDate->gt($dueDate);
+    $daysOverdue = $isOverdue ? $dueDate->diffInDays($returnDate) : 0;
+
+    $this->update([
+        'return_date' => $returnDate->toDateString(),
+        'status' => $isOverdue ? 'overdue' : 'returned',
+        'days_overdue' => $daysOverdue,
+        'fine_amount' => $isOverdue ? $daysOverdue * $finePerDay : null,
+    ]);
+}
 
     public function payFine(): void
     {

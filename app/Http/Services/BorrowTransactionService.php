@@ -14,74 +14,72 @@ use Carbon\Carbon;
 class BorrowTransactionService
 {
 
-   public function requestBook(array $data)
-{
-    $member = User::find($data['user_id']);
-    $book = Book::find($data['book_id']);
+    public function requestBook(array $data)
+    {
+        $member = User::find($data['user_id']);
+        $book = Book::find($data['book_id']);
 
-    $genericMessage = 'Unable to process your request at this time.';
+        $genericMessage = 'Unable to process your request at this time.';
 
-    // ✅ Validate user
-    if (!$member || $member->status !== 'active') {
-        throw ValidationException::withMessages([
-            'user_id' => [$genericMessage]
-        ]);
-    }
+        // Validate user
+        if (!$member || $member->status !== 'active') {
+            throw ValidationException::withMessages([
+                'user_id' => [$genericMessage]
+            ]);
+        }
 
-    // ✅ Validate book
-    if (!$book || $book->status === 'deleted') {
-        throw ValidationException::withMessages([
-            'book_id' => [$genericMessage]
-        ]);
-    }
+        if (!$book || $book->status === 'deleted') {
+            throw ValidationException::withMessages([
+                'book_id' => [$genericMessage]
+            ]);
+        }
 
-    // ❗ Only block if STILL pending
-    $existingPendingRequest = BorrowRequest::where('user_id', $member->id)
-        ->where('book_id', $book->book_id)
-        ->where('status', 'pending')
-        ->exists();
-
-    // ❗ Only block if STILL actively borrowed
-    $activeBorrow = BorrowTransaction::where('user_id', $member->id)
-        ->where('book_id', $book->book_id)
-        ->whereIn('status', ['borrowed', 'overdue'])
-        ->exists();
-
-    if ($existingPendingRequest) {
-        throw ValidationException::withMessages([
-            'book_id' => ['You already have a pending request for this book.']
-        ]);
-    }
-
-    if ($activeBorrow) {
-        throw ValidationException::withMessages([
-            'book_id' => ['You still have this book. Please return it first.']
-        ]);
-    }
-
-    // ✅ ALWAYS create new request (no reuse of old ones)
-    return DB::transaction(function () use ($member, $book) {
-
-        $lastPosition = BorrowRequest::where('book_id', $book->book_id)
+        // Only block if STILL pending
+        $existingPendingRequest = BorrowRequest::where('user_id', $member->id)
+            ->where('book_id', $book->book_id)
             ->where('status', 'pending')
-            ->max('queue_position') ?? 0;
+            ->exists();
 
-        $request = BorrowRequest::create([
-            'user_id' => $member->id,
-            'book_id' => $book->book_id,
-            'queue_position' => $lastPosition + 1,
-            'status' => 'pending',
-            'requested_at' => Carbon::now(),
-        ]);
+        //Only block if STILL actively borrowed
+        $activeBorrow = BorrowTransaction::where('user_id', $member->id)
+            ->where('book_id', $book->book_id)
+            ->whereIn('status', ['borrowed', 'overdue'])
+            ->exists();
 
-        return [
-            'request_id' => $request->request_id,
-            'queue_position' => $request->queue_position,
-            'message' => "Request submitted successfully.",
-            'book_title' => $book->title,
-        ];
-    });
-}
+        if ($existingPendingRequest) {
+            throw ValidationException::withMessages([
+                'book_id' => ['You already have a pending request for this book.']
+            ]);
+        }
+
+        if ($activeBorrow) {
+            throw ValidationException::withMessages([
+                'book_id' => ['You still have this book. Please return it first.']
+            ]);
+        }
+
+        return DB::transaction(function () use ($member, $book) {
+
+            $lastPosition = BorrowRequest::where('book_id', $book->book_id)
+                ->where('status', 'pending')
+                ->max('queue_position') ?? 0;
+
+            $request = BorrowRequest::create([
+                'user_id' => $member->id,
+                'book_id' => $book->book_id,
+                'queue_position' => $lastPosition + 1,
+                'status' => 'pending',
+                'requested_at' => Carbon::now(),
+            ]);
+
+            return [
+                'request_id' => $request->request_id,
+                'queue_position' => $request->queue_position,
+                'message' => "Request submitted successfully.",
+                'book_title' => $book->title,
+            ];
+        });
+    }
 
     /**
      * Step 2: Librarian approves the request (student is next to pick up)
@@ -132,14 +130,31 @@ class BorrowTransactionService
             ]);
         }
 
-        return DB::transaction(function () use ($request, $pickupDays) {
-            $request->approve((int)$pickupDays);
+        return DB::transaction(function () use ($request, $pickupDays, $book) {
+
+            //LOCK row to prevent race condition
+            $book->refresh();
+
+            if ($book->available_copies <= 0) {
+                throw ValidationException::withMessages([
+                    'available_copies' => ['No copies available at this moment.']
+                ]);
+            }
+
+            //RESERVE COPY HERE
+            $book->decrement('available_copies');
+
+            $request->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+                'expires_at' => now()->addDays($pickupDays),
+            ]);
 
             return [
                 'request_id' => $request->request_id,
-                'status'     => 'approved',
+                'status'     => 'approved_reserved',
                 'expires_at' => $request->expires_at,
-                'message'    => "Request approved! Student has {$pickupDays} day(s) to pick up the book.",
+                'message'    => "Reserved! Student has {$pickupDays} day(s) to pick up.",
             ];
         });
     }
@@ -172,43 +187,41 @@ class BorrowTransactionService
     {
         $request = BorrowRequest::with('book')->findOrFail($requestId);
 
+        // Must be approved (reservation made)
         if ($request->status !== 'approved') {
             throw ValidationException::withMessages([
                 'status' => ['Request must be approved before completing borrow.']
             ]);
         }
 
-        $book = $request->book;
-
-        // Check again if book has available copies
-        if ($book->available_copies <= 0) {
-            throw ValidationException::withMessages([
-                'available_copies' => ['No copies available. Cannot complete borrow.']
-            ]);
-        }
+        // Check reservation expiry
         if ($request->expires_at && now()->greaterThan($request->expires_at)) {
             throw ValidationException::withMessages([
                 'status' => ['Reservation has expired.']
             ]);
         }
+
+        // Ensure user does not have active borrow
         $activeBorrow = BorrowTransaction::where('user_id', $request->user_id)
             ->where('book_id', $request->book_id)
             ->whereIn('status', ['borrowed', 'overdue'])
             ->first();
-        if ($request->status === 'completed') {
-            throw ValidationException::withMessages([
-                'request_id' => ['This request is already completed. Please create a new request.']
-            ]);
-        }
+
         if ($activeBorrow) {
             throw ValidationException::withMessages([
                 'book_id' => ['You still have an active borrow for this book. Please return it first.']
             ]);
         }
 
+        // Ensure request is not already completed
+        if ($request->status === 'completed') {
+            throw ValidationException::withMessages([
+                'request_id' => ['This request is already completed. Please create a new request.']
+            ]);
+        }
 
-        return DB::transaction(function () use ($request, $book, $dueDateDays) {
-            // Create the actual borrow transaction
+        return DB::transaction(function () use ($request, $dueDateDays) {
+            // Create the borrow transaction
             $transaction = BorrowTransaction::create([
                 'user_id' => $request->user_id,
                 'book_id' => $request->book_id,
@@ -218,28 +231,27 @@ class BorrowTransactionService
                 'status' => 'borrowed',
             ]);
 
+            // Mark request as completed
             $request->update([
                 'status' => 'completed',
             ]);
 
-            // ✅ Decrement copies
-            $book->decrement('available_copies');
+            // No decrement of available_copies here because already reserved
 
-            // ✅ Promote next queue
-            $this->promoteNextInQueue($book->book_id);
+            // Optionally promote next in queue if you want auto-approval for next pending request
+            $this->promoteNextInQueue($request->book_id);
 
             return [
                 'transaction_id' => $transaction->transaction_id,
                 'request_id' => $request->request_id,
                 'user_id' => $request->user_id,
-                'book_id' => $book->book_id,
+                'book_id' => $request->book_id,
                 'borrow_date' => $transaction->borrow_date,
                 'due_date' => $transaction->due_date,
                 'message' => 'Book borrowed successfully!',
             ];
         });
     }
-
 
     public function cancelRequest($requestId)
     {
@@ -284,67 +296,49 @@ class BorrowTransactionService
             ]);
         }
 
-        $returnDate = Carbon::now();
+        // ✅ Use startOfDay() on both sides to avoid fractional day calculation
+        $returnDate = Carbon::now()->startOfDay();
+        $dueDate = Carbon::parse($transaction->due_date)->startOfDay();
 
-        // Overdue logic
-        $isOverdue = $returnDate->gt($transaction->due_date);
+        $isOverdue = $returnDate->gt($dueDate);
         $daysOverdue = $isOverdue
-            ? $transaction->due_date->diffInDays($returnDate)
+            ? $dueDate->diffInDays($returnDate)
             : 0;
 
-        // Dynamic fine inputs
         $finePerDay = $data['fine_per_day'] ?? null;
-        $manualFine = $data['fine_amount'] ?? null;
 
-        if (!$isOverdue && ($finePerDay !== null || $manualFine !== null)) {
+        if ($isOverdue && (!$finePerDay || !is_numeric($finePerDay))) {
             throw ValidationException::withMessages([
-                'fine' => ['Fine can only be applied if the book is overdue.']
+                'fine_per_day' => ['You must provide a numeric fine per day for overdue books.']
             ]);
         }
 
+        $fineAmount = $isOverdue
+            ? $daysOverdue * (int) $finePerDay
+            : 0;
 
-        $defaultRate = 0;
+        return DB::transaction(function () use ($transaction, $returnDate, $daysOverdue, $fineAmount, $finePerDay, $isOverdue) {
 
-        $fineAmount = $manualFine
-            ?? ($finePerDay
-                ? $daysOverdue * $finePerDay
-                : $daysOverdue * $defaultRate
-            );
-
-        return DB::transaction(function () use (
-            $transaction,
-            $returnDate,
-            $daysOverdue,
-            $fineAmount,
-            $isOverdue
-        ) {
-
-            $transaction->update([
-                'return_date' => $returnDate->toDateString(),
-                'status' => $isOverdue ? 'overdue' : 'returned',
-                'days_overdue' => $daysOverdue,
-                'fine_amount' => $isOverdue ? $fineAmount : 0,
-                'fine_paid' => !$isOverdue
-            ]);
+            // ✅ Delegate to model helper, passing finePerDay dynamically
+            $transaction->completeReturn($returnDate, (int) ($finePerDay ?? 0));
 
             // Restore stock
             $transaction->book->increment('available_copies');
 
-            // Reuse queue logic (important)
+            // Promote next in queue
             $this->promoteNextInQueue($transaction->book_id);
 
             return [
                 'transaction_id' => $transaction->transaction_id,
-                'status' => $transaction->status,
-                'return_date' => $transaction->return_date,
-                'days_overdue' => $daysOverdue,
-                'fine_amount' => $fineAmount,
-                'fine_paid' => $transaction->fine_paid,
+                'status'         => $transaction->fresh()->status,
+                'return_date'    => $transaction->return_date,
+                'days_overdue'   => $daysOverdue,
+                'fine_amount'    => $fineAmount,
+                'fine_paid'      => $transaction->fine_paid,
                 'requires_payment' => $isOverdue,
             ];
         });
     }
-
     /**
      * Cancel a request (student changes mind or request expires)
      */
@@ -355,12 +349,20 @@ class BorrowTransactionService
      */
     private function promoteNextInQueue($bookId)
     {
+        $book = Book::find($bookId);
+        if ($book->available_copies <= 0) return;
         $nextRequest = BorrowRequest::where('book_id', $bookId)
             ->where('status', 'pending')
             ->orderBy('queue_position')
             ->first();
         if ($nextRequest) {
-            Log::info("User {$nextRequest->user_id} is now first in queue for book {$bookId}");
+            $nextRequest->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+                'expires_at' => now()->addDays(2),
+            ]);
+
+            $book->decrement('available_copies');
         }
     }
 
@@ -420,7 +422,11 @@ class BorrowTransactionService
         }
         if ($status = request('status')) {
             if ($status !== 'all') {
-                $query->where('status', $status);
+                if ($status === 'returned') {
+                    $query->whereNotNull('return_date');
+                } else {
+                    $query->where('status', $status);
+                }
             }
         }
 
@@ -469,9 +475,13 @@ class BorrowTransactionService
             ->where('book_id', $bookId);
 
         // 2. Optional: Add status filtering if provided in the request
-        if ($status = request('status')) {
+         if ($status = request('status')) {
             if ($status !== 'all') {
-                $query->where('status', $status);
+                if ($status === 'returned') {
+                    $query->whereNotNull('return_date');
+                } else {
+                    $query->where('status', $status);
+                }
             }
         }
 
@@ -528,17 +538,12 @@ class BorrowTransactionService
     public function getUserRequests($userId = null, int $perPage = 10)
     {
         $query = BorrowRequest::with(['book', 'user']);
-
-        // =========================
-        // 👤 USER FILTER
-        // =========================
+        // USER FILTER
         if ($userId !== null) {
             $query->where('user_id', $userId);
         }
 
-        // =========================
-        // 🔍 SEARCH FILTER
-        // =========================
+        // SEARCH FILTER
         if ($search = request('search')) {
             $query->where(function ($q) use ($search) {
                 $q->whereHas('user', function ($uq) use ($search) {
@@ -552,18 +557,12 @@ class BorrowTransactionService
             });
         }
 
-        // =========================
-        // 📌 STATUS FILTER
-        // =========================
         if ($status = request('status')) {
             if ($status !== 'all') {
                 $query->where('status', $status);
             }
         }
 
-        // =========================
-        // ⏳ EXPIRATION FILTER
-        // =========================
         if ($expired = request('expired')) {
             if ($expired === 'true') {
                 $query->whereNotNull('expires_at')
@@ -578,15 +577,11 @@ class BorrowTransactionService
             }
         }
 
-        // =========================
-        // ⚠️ REQUIRED ORDERING
-        // =========================
-        $query->orderByDesc('requested_at')
-            ->orderByDesc('request_id'); // prevents duplicate cursor issue
 
-        // =========================
-        // CURSOR PAGINATION
-        // =========================
+        $query->orderByDesc('requested_at')
+            ->orderByDesc('request_id');
+
+
         $requests = $query->cursorPaginate($perPage);
 
         return [
@@ -625,9 +620,6 @@ class BorrowTransactionService
         ];
     }
 
-    /**
-     * Mark unpaid fines as paid
-     */
     public function payFine($transactionId)
     {
         $transaction = BorrowTransaction::findOrFail($transactionId);
@@ -662,29 +654,25 @@ class BorrowTransactionService
         return ['expired_count' => $count];
     }
 
-    /**
-     * Expire a request manually (after 7 days)
-     */
     public function expireRequest($requestId)
     {
-        $request = BorrowRequest::findOrFail($requestId);
-
+        $request = BorrowRequest::with('book')->findOrFail($requestId);
         if ($request->status !== 'approved') {
             throw ValidationException::withMessages([
                 'status' => ['Only approved requests can be expired.']
             ]);
         }
-
         return DB::transaction(function () use ($request) {
-            $request->expire();
-
-            // Promote next in queue
-            $this->promoteNextInQueue($request->book_id);
-
+            $book = Book::lockForUpdate()->find($request->book_id);
+            $book->increment('available_copies');
+            $request->update([
+                'status' => 'expired',
+            ]);
+            $this->promoteNextInQueue($book->book_id);
             return [
                 'request_id' => $request->request_id,
-                'status' => $request->status,
-                'message' => 'Request expired due to non-pickup.',
+                'status' => 'expired',
+                'message' => 'Request expired and slot reassigned to next in queue.',
             ];
         });
     }

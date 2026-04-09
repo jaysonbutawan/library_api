@@ -134,24 +134,22 @@ class BorrowTransactionController extends Controller
      * Return a borrowed book
      * POST /api/borrow-transactions/{transactionId}/return
      */
-    public function returnBook(Request $request, $id)
-    {
-        // Validate here (NOT in service)
-        $validated = $request->validate([
-            'fine_per_day' => 'nullable|numeric|min:0',
-            'fine_amount'  => 'nullable|numeric|min:0',
-        ]);
+public function returnBook(Request $request, $transaction_id)
+{
+    $validated = $request->validate([
+        'fine_per_day' => 'nullable|numeric|min:0',
+    ]);
 
-        $result = $this->service->returnBook($id, $validated);
+    $result = $this->service->returnBook($transaction_id, $validated);
 
-        return response()->json([
-            'success' => true,
-            'data' => $result,
-            'message' => $result['requires_payment']
-                ? "Book returned with fine."
-                : "Book returned successfully."
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data' => $result,
+        'message' => $result['requires_payment']
+            ? "Book returned with fine."
+            : "Book returned successfully."
+    ]);
+}
 
     /**
      * Cancel a borrow request
