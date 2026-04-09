@@ -37,7 +37,7 @@ class StoreBookRequest extends FormRequest
                 'max:255'  // Restrict to valid values
             ],
             'publication_year' => [
-                'nullable',
+                'required',
                 'integer',
                 'digits:4',
                 'min:1000',
@@ -80,6 +80,7 @@ class StoreBookRequest extends FormRequest
             'status.in' => 'Status must be one of: available, unavailable, borrowed.',
 
             'publication_year.integer' => 'Publication year must be a valid year.',
+            'publication_year.required' => 'Provide a valid publication year.',
             'publication_year.min' => 'Publication year must be 1000 or later.',
             'publication_year.max' => 'Publication year cannot be in the future.',
             'publication_year.digits' => 'Publication year must be a 4-digit year.',

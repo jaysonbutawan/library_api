@@ -46,17 +46,11 @@ class User extends Authenticatable
         return $this->hasMany(BorrowTransaction::class, 'user_id');
     }
 
-    public function fines()
+      public function fines()
     {
-        return $this->hasManyThrough(
-            Fine::class,
-            BorrowTransaction::class,
-            'user_id',
-            'transaction_id',
-            'id',
-            'transaction_id'
-        );
+        return $this->hasMany(Fine::class, 'user_id');
     }
+
     public function isStudent(): bool
     {
         return !is_null($this->student_id);

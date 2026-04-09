@@ -28,7 +28,8 @@ class BookService
 
     public function getBooks($id = null, int $perPage = 10)
     {
-        $query = Book::with('category');
+        $query = Book::with('category')
+        ->where('status', '!=', 'deleted'); 
 
         // 🔍 SEARCH
         if ($search = request('search')) {
@@ -100,6 +101,19 @@ class BookService
         }
 
         $book->update(['status' => 'unavailable']);
+
+        return $book;
+    }
+    public function softDestroy($id): Book
+    {
+        $book = Book::find($id);
+
+        if (!$book) {
+            throw new ModelNotFoundException('Book not found.');
+        }
+
+        // Soft-delete style: just change status
+        $book->update(['status' => 'deleted']);
 
         return $book;
     }

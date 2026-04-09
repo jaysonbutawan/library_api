@@ -134,29 +134,23 @@ class BorrowTransactionController extends Controller
      * Return a borrowed book
      * POST /api/borrow-transactions/{transactionId}/return
      */
-    public function returnBook($transactionId)
+    public function returnBook(Request $request, $id)
     {
-        try {
-            $result = $this->service->returnBook($transactionId);
+        // Validate here (NOT in service)
+        $validated = $request->validate([
+            'fine_per_day' => 'nullable|numeric|min:0',
+            'fine_amount'  => 'nullable|numeric|min:0',
+        ]);
 
-            return response()->json([
-                'message' => $result['message'],
-                'data' => [
-                    'transaction_id' => $result['transaction_id'],
-                    'status' => $result['status'],
-                    'return_date' => $result['return_date'],
-                    'days_overdue' => $result['days_overdue'],
-                    'fine_amount' => $result['fine_amount'],
-                    'fine_paid' => $result['fine_paid'],
-                ]
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => $e->getMessage()], 404);
-        } catch (ValidationException $e) {
-            return response()->json(['errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
+        $result = $this->service->returnBook($id, $validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+            'message' => $result['requires_payment']
+                ? "Book returned with fine."
+                : "Book returned successfully."
+        ]);
     }
 
     /**
@@ -251,6 +245,42 @@ class BorrowTransactionController extends Controller
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
+    /**
+     * Get all transactions associated with a specific book
+     * Route: GET /api/library/books/{bookId}/transactions
+     */
+    public function getTransactionsByBook(Request $request, $bookId)
+    {
+        try {
+            // 1. Sanitize the per_page input (default 10, max 50)
+            $perPage = (int) $request->input('per_page', 10);
+            $perPage = ($perPage > 0 && $perPage <= 50) ? $perPage : 10;
+
+            // 2. Call the service method
+            $transactions = $this->service->getTransactionsByBookId((int) $bookId, $perPage);
+
+            // 3. Return the flattened JSON response
+            return response()->json([
+                'message' => "Transactions for Book ID: {$bookId} retrieved successfully.",
+
+                // ✅ Flattened data as per your reference
+                'data'  => $transactions['data'],
+                'meta'  => $transactions['meta'],
+
+                // ✅ Total count of items in the current cursor page
+                'count' => count($transactions['data']),
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'The specified book was not found.'
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while fetching transactions.',
+                'error'   => $e->getMessage() // Useful for debugging (remove in production)
+            ], 500);
+        }
+    }
 
     /**
      * Get borrow transactions for a specific user
@@ -259,7 +289,7 @@ class BorrowTransactionController extends Controller
     public function getUserTransactions(Request $request, $userId)
     {
         try {
-             $perPage = min($request->input('per_page', 10), 50);
+            $perPage = min($request->input('per_page', 10), 50);
             $transactions = $this->service->getBorrowTransactionsByMemberId($userId, $perPage);
 
             return response()->json([

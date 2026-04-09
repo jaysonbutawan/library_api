@@ -14,8 +14,6 @@ class Fine extends Model
         'transaction_id',
         'amount',
         'paid_status',
-        'days_late',
-        'rate_per_day'
     ];
 
     public $timestamps = false;

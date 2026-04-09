@@ -94,4 +94,26 @@ class BooksController extends Controller
             ], 404);
         }
     }
+    
+    public function softDestroy($id)
+    {
+        try {
+            $book = $this->bookService->softDestroy($id);
+
+            return response()->json([
+                'message' => 'Book marked as deleted successfully.',
+                'book_id' => $book->book_id,
+                'status' => $book->status
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

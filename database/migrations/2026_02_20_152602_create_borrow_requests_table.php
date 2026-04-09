@@ -42,10 +42,6 @@ return new class extends Migration
                 ->on('books')
                 ->onDelete('cascade');
 
-            // Composite unique: one pending request per user per book
-            $table->unique(['user_id', 'book_id', 'status'], 'unique_pending_request');
-
-            // Index for finding next in queue
             $table->index(['book_id', 'status', 'queue_position']);
         });
     }
