@@ -253,34 +253,44 @@ class BorrowTransactionService
         });
     }
 
-    public function cancelRequest($requestId)
-    {
-        $request = BorrowRequest::findOrFail($requestId);
+   public function cancelRequest($requestId)
+{
+    $request = BorrowRequest::with('book')->findOrFail($requestId);
 
-        if ($request->status === 'cancelled') {
-            throw ValidationException::withMessages([
-                'status' => ['Request is already cancelled.']
-            ]);
+    if ($request->status === 'cancelled') {
+        throw ValidationException::withMessages([
+            'status' => ['Request is already cancelled.']
+        ]);
+    }
+
+    return DB::transaction(function () use ($request) {
+
+        $book = Book::lockForUpdate()->find($request->book_id);
+
+        // CASE 1: approved but still active reservation
+        if ($request->status === 'approved') {
+
+            // restore stock because it was reserved earlier
+            $book->increment('available_copies');
         }
 
-        return DB::transaction(function () use ($request) {
-            // If approved but not picked up within 7 days, auto-expire
-            if ($request->status === 'approved' && Carbon::now()->greaterThan($request->expires_at)) {
-                $request->expire();
-            } else {
-                $request->cancel();
-            }
+        // CASE 2: expired logic (your existing rule)
+        if ($request->status === 'approved' && Carbon::now()->greaterThan($request->expires_at)) {
+            $request->expire();
+        } else {
+            $request->cancel();
+        }
 
-            // Promote next in queue
-            $this->promoteNextInQueue($request->book_id);
+        // promote next in queue
+        $this->promoteNextInQueue($request->book_id);
 
-            return [
-                'request_id' => $request->request_id,
-                'status' => $request->status,
-                'message' => 'Request cancelled.',
-            ];
-        });
-    }
+        return [
+            'request_id' => $request->request_id,
+            'status' => $request->status,
+            'message' => 'Request cancelled.',
+        ];
+    });
+}
 
     /**
      * Student returns the book
@@ -334,7 +344,6 @@ class BorrowTransactionService
                 'return_date'    => $transaction->return_date,
                 'days_overdue'   => $daysOverdue,
                 'fine_amount'    => $fineAmount,
-                'fine_paid'      => $transaction->fine_paid,
                 'requires_payment' => $isOverdue,
             ];
         });
@@ -596,6 +605,7 @@ class BorrowTransactionService
                         'book_id' => $request->book->book_id,
                         'title' => $request->book->title,
                         'author' => $request->book->author,
+                        'available_copies' => $request->book->available_copies,
                     ] : null,
 
                     'status' => $request->status,
@@ -620,25 +630,25 @@ class BorrowTransactionService
         ];
     }
 
-    public function payFine($transactionId)
-    {
-        $transaction = BorrowTransaction::findOrFail($transactionId);
+    // public function payFine($transactionId)
+    // {
+    //     $transaction = BorrowTransaction::findOrFail($transactionId);
 
-        if ($transaction->fine_amount <= 0 || $transaction->fine_paid) {
-            throw ValidationException::withMessages([
-                'fine' => ['No outstanding fine to pay.']
-            ]);
-        }
+    //     if ($transaction->fine_amount <= 0 || $transaction->fine_paid) {
+    //         throw ValidationException::withMessages([
+    //             'fine' => ['No outstanding fine to pay.']
+    //         ]);
+    //     }
 
-        $transaction->payFine();
+    //     $transaction->payFine();
 
-        return [
-            'transaction_id' => $transaction->transaction_id,
-            'fine_amount' => $transaction->fine_amount,
-            'fine_paid' => $transaction->fine_paid,
-            'message' => 'Fine paid successfully.',
-        ];
-    }
+    //     return [
+    //         'transaction_id' => $transaction->transaction_id,
+    //         'fine_amount' => $transaction->fine_amount,
+    //         'fine_paid' => $transaction->fine_paid,
+    //         'message' => 'Fine paid successfully.',
+    //     ];
+    // }
 
     public function cleanupExpiredRequests()
     {

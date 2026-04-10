@@ -2,49 +2,64 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\PayFineRequest;
-use App\Http\services\FinesService;
+use App\Http\Services\FinesService;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class FinesController extends Controller
 {
-    public function __construct(
-        protected FinesService $finesService
-    ) {}
+   private FinesService $service;
 
-    public function finesChoice(Request $request)
+    public function __construct(FinesService $service)
     {
-        $studentId = $request->query('student_id');
-        $department = $request->query('department');
-
-        $result = $this->finesService->listFines($studentId, $department);
-
-        return response()->json($result);
+        $this->service = $service;
     }
 
-    public function payFine(PayFineRequest $request, $fineId)
+    /**
+     * Get all fines or filter by student_id
+     */
+    public function index(Request $request)
     {
-        $validated = $request->validated();
-        $paidAmount = $validated['amount'];
-
-        $result = $this->finesService->payFine($fineId, $paidAmount);
+        $studentId = $request->query('student_id');
 
         return response()->json(
-            $result['ok'] ? ['message' => $result['message'], 'data' => $result['data']] : ['message' => $result['message']],
-            $result['status']
+            $this->service->getFines($studentId)
         );
     }
 
-    public function memberFines($memberId)
+    /**
+     * Pay fine (partial or full)
+     */
+    public function pay(Request $request)
     {
-        $result = $this->finesService->listMemberFines($memberId);
-        return response()->json($result);
-    }
+        $request->validate([
+            'fine_id' => 'required|integer',
+            'amount' => 'required|numeric|min:1'
+        ]);
 
-    public function unpaidFines()
-    {
-        $result = $this->finesService->listUnpaidFines();
-        return response()->json($result);
+        try {
+            $result = $this->service->payFine(
+                $request->fine_id,
+                $request->amount
+            );
+
+            return response()->json([
+                'message' => 'Payment successful.',
+                'data' => $result
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Fine not found.'
+            ], 404);
+
+        } catch (\Exception $e) {
+            $code = (int) $e->getCode();
+            $status = ($code >= 400 && $code < 600) ? $code : 500;
+
+            return response()->json([
+                'message' => $e->getMessage()
+            ], $status);
+        }
     }
 }

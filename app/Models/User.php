@@ -24,6 +24,7 @@ class User extends Authenticatable
         'role_id',
         'status',
         'registered_at',
+        'admission_token',
         'last_login'
     ];
 

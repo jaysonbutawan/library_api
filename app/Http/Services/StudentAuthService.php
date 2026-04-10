@@ -10,55 +10,48 @@ use Illuminate\Http\Client\ConnectionException;
 class StudentAuthService
 {
     protected string $admissionApiUrl;
-    protected string $admissionApiToken;
 
     public function __construct(bool $isTest = false)
     {
+        $url = config('services.admission.url');
 
-    if ($isTest) {
-        return; // Skip API check for test login
-    }
-        $url   = config('services.admission.url');
-        $token = config('services.admission.token');
-
-        if (!$url || !$token) {
+        if (!$url) {
             throw new \RuntimeException(
-                'Admission API is not configured. Check ADMISSION_API_URL and ADMISSION_API_TOKEN in .env'
+                'Admission API is not configured. Check ADMISSION_API_URL in .env'
             );
         }
 
-        $this->admissionApiUrl   = $url;
-        $this->admissionApiToken = $token;
-    }
+        $this->admissionApiUrl = $url;
 
+        if ($isTest) {
+            $this->admissionApiUrl = 'http://fake-local-url';
+        }
+    }
     public function login(array $credentials): array
     {
-        // ─── 1. Network / Unreachable ────────────────────────────────────────
+        // ─── 1. Call Admission API ─────────────────────────────────────────────
         try {
-            $response = Http::withToken($this->admissionApiToken)
-                ->timeout(8)        // stop waiting after 8 seconds
-                ->connectTimeout(5) // stop connecting after 5 seconds
+            $response = Http::acceptJson()
+                ->asJson()
+                ->withoutVerifying()
+                ->timeout(8)
+                ->connectTimeout(5)
                 ->post("{$this->admissionApiUrl}/api/auth/login", $credentials);
         } catch (ConnectionException $e) {
-            // Server is down, DNS failure, refused connection, or timed out
             Log::error('Admission API unreachable', [
                 'url'     => $this->admissionApiUrl,
                 'message' => $e->getMessage(),
             ]);
 
             return [
-                'success'     => false,
-                'unavailable' => true,  // <-- flag the frontend can check
-                'message'     => 'The student portal is currently unreachable. Please try again later or contact support.',
+                'success'    => false,
+                'message'    => 'Could not reach the student portal. Please try again later.',
+                'error_type' => 'connection_exception',
             ];
         }
 
-        // ─── 2. API responded but credentials are wrong (401 / 422) ─────────
-        if ($response->status() === 401 || $response->status() === 422) {
-            Log::warning('Admission API rejected credentials', [
-                'status' => $response->status(),
-            ]);
-
+        // ─── 2. Invalid credentials ────────────────────────────────────────────
+        if (in_array($response->status(), [401, 422])) {
             return [
                 'success'     => false,
                 'unavailable' => false,
@@ -66,9 +59,9 @@ class StudentAuthService
             ];
         }
 
-        // ─── 3. API responded with any other non-2xx (500, 503, etc.) ────────
+        // ─── 3. Other API errors ───────────────────────────────────────────────
         if (!$response->successful()) {
-            Log::error('Admission API returned unexpected error', [
+            Log::error('Admission API error', [
                 'status'   => $response->status(),
                 'response' => $response->body(),
             ]);
@@ -76,308 +69,102 @@ class StudentAuthService
             return [
                 'success'     => false,
                 'unavailable' => true,
-                'message'     => 'The student portal returned an unexpected error. Please try again later.',
+                'message'     => 'The student portal returned an error. Try again later.',
             ];
         }
 
-        // ─── 4. Parse and validate the response payload ───────────────────────
-        $studentData = $response->json();
+        // ─── 4. Parse Response ─────────────────────────────────────────────────
+        $data = $response->json();
 
-        if (!isset($studentData['student_id'])) {
-            Log::error('Missing student_id in admission API response', $studentData);
+        $student = $data['Student'] ?? null;
+
+        if (!$student) {
+            Log::error('Student data missing', $data);
 
             return [
-                'success'     => false,
-                'unavailable' => false,
-                'message'     => 'Invalid student data received from the portal.',
+                'success' => false,
+                'message' => 'Invalid student data received.',
             ];
         }
 
-        // ─── 5. Sync student into local DB ────────────────────────────────────
+        // ─── 5. Extract Fields ─────────────────────────────────────────────────
+        $studentId = $student['student_info']['student_number']
+            ?? ('EXT-' . $student['user_id']);
+
+        $fullName = $student['full_name']
+            ?? $data['user']['name']
+            ?? 'Unknown';
+
+        $email = $student['email'] ?? null;
+
+        $status = match ($student['status'] ?? 'active') {
+            'approved' => 'active',
+            'blocked'  => 'blocked',
+            default    => 'inactive',
+        };
+        $admissionToken = $data['token'] ?? null;
+
+        // ─── 6. Sync to Local DB ───────────────────────────────────────────────
         try {
             $user = User::updateOrCreate(
-                ['student_id' => $studentData['student_id']],
+                ['student_id' => $studentId],
                 [
-                    'full_name'     => $studentData['full_name'] ?? $studentData['name'] ?? 'Unknown',
-                    'email'         => $studentData['email'] ?? null,
-                    'department'    => $studentData['department'] ?? null,
-                    'status'        => 'active',
-                    'role'          => 'student',
+                    'full_name'     => $fullName,
+                    'email'         => $email,
+                    'department'    => $student['course']['department'] ?? null,
+                    'status'        => $status,
+                    'role_id'          => 3,
                     'password'      => null,
                     'registered_at' => now(),
+                    'admission_token' => $admissionToken,
                 ]
             );
         } catch (\Exception $e) {
-            Log::error('Failed to sync student to local DB', [
-                'student_id' => $studentData['student_id'],
+            Log::error('DB sync failed', [
+                'student_id' => $studentId,
                 'message'    => $e->getMessage(),
             ]);
 
             return [
-                'success'     => false,
-                'unavailable' => false,
-                'message'     => 'Authentication succeeded but failed to create your session. Please try again.',
+                'success' => false,
+                'message' => 'Login succeeded but failed to save user.',
             ];
         }
 
-        // ─── 6. Issue Sanctum token ───────────────────────────────────────────
+        // ─── 7. Generate Local Token ───────────────────────────────────────────
         $token = $user->createToken('library-token')->plainTextToken;
 
-        Log::info('Student login successful', [
-            'student_id' => $user->student_id,
-            'email'      => $user->email,
+        Log::info('Student login success', [
+            'student_id' => $studentId,
+            'email'      => $email,
         ]);
 
+        // ─── 8. Return Response ────────────────────────────────────────────────
         return [
-            'success'     => true,
-            'unavailable' => false,
-            'message'     => 'Login successful.',
-            'user'        => [
-                'id'           => $user->id,
-                'student_id'   => $user->student_id,
-                'full_name'    => $user->full_name,
-                'email'        => $user->email,
-                'department'   => $user->department,
-                'status'       => $user->status,
+            'success' => true,
+            'message' => 'Login successful.',
+            'token'   => $token,
+
+            'user' => [
+                'id'            => $user->id,
+                'student_id'    => $user->student_id,
+                'full_name'     => $user->full_name,
+                'email'         => $user->email,
+                'department'    => $user->department,
+                'status'        => $user->status,
                 'registered_at' => $user->registered_at,
             ],
-            'token' => $token,
+
+            // FULL raw API response
+            'admission_response' => $data,
+
+            // extracted parts (optional convenience)
+            'external' => [
+                'admission_token' => $admissionToken,
+                'course_id'       => $student['course_id'] ?? null,
+                'course'          => $student['course'] ?? null,
+                'student_info'    => $student['student_info'] ?? null,
+            ],
         ];
     }
-
-
-    /**
-     * Get student profile from library database
-     */
-    public function profile(User $user): array
-    {
-        return [
-            'success' => true,
-            'data' => [
-                'id' => $user->id,
-                'student_id' => $user->student_id,
-                'full_name' => $user->full_name,
-                'email' => $user->email,
-                'department' => $user->department,
-                'status' => $user->status,
-                'role' => $user->role,
-                'registered_at' => $user->registered_at,
-                'updated_at' => $user->updated_at,
-            ]
-        ];
-    }
-
-    /**
-     * Get student profile with library statistics
-     */
-    public function profileWithStats(User $user): array
-    {
-        $activeBorrows = $user->borrows()
-            ->where('status', 'borrowed')
-            ->count();
-
-        $totalBorrows = $user->borrows()
-            ->count();
-
-        $pendingRequests = $user->requests()
-            ->whereIn('status', ['pending', 'approved'])
-            ->count();
-
-        $overdueBorrows = $user->borrows()
-            ->where('status', 'overdue')
-            ->count();
-
-        $unpaidFines = $user->borrows()
-            ->where('fine_paid', false)
-            ->whereNotNull('fine_amount')
-            ->where('fine_amount', '>', 0)
-            ->sum('fine_amount');
-
-        return [
-            'success' => true,
-            'data' => [
-                'profile' => [
-                    'id' => $user->id,
-                    'student_id' => $user->student_id,
-                    'full_name' => $user->full_name,
-                    'email' => $user->email,
-                    'department' => $user->department,
-                    'status' => $user->status,
-                    'role' => $user->role,
-                    'registered_at' => $user->registered_at,
-                ],
-                'statistics' => [
-                    'active_borrows' => $activeBorrows,
-                    'total_borrows' => $totalBorrows,
-                    'pending_requests' => $pendingRequests,
-                    'overdue_count' => $overdueBorrows,
-                    'unpaid_fines' => (float) $unpaidFines,
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * Update user profile (basic info only)
-     * Note: Student ID and role cannot be updated
-     */
-    public function updateProfile(User $user, array $data): array
-    {
-        try {
-            // Only allow updating these fields
-            $allowedFields = ['full_name', 'email', 'department'];
-            $updateData = array_intersect_key($data, array_flip($allowedFields));
-
-            if (empty($updateData)) {
-                return [
-                    'success' => false,
-                    'message' => 'No valid fields to update.',
-                ];
-            }
-
-            $user->update($updateData);
-
-            Log::info('Student profile updated', [
-                'student_id' => $user->student_id,
-                'updated_fields' => array_keys($updateData)
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Profile updated successfully.',
-                'data' => $this->profile($user)['data']
-            ];
-        } catch (\Exception $e) {
-            Log::error('Profile update error', [
-                'student_id' => $user->student_id,
-                'message' => $e->getMessage()
-            ]);
-
-            return [
-                'success' => false,
-                'message' => 'An error occurred while updating profile.',
-            ];
-        }
-    }
-
-    /**
-     * Logout - revoke current token
-     */
-    public function logout(User $user): array
-    {
-        try {
-            // Revoke the current token
-            $user->tokens()->delete();
-
-            Log::info('Student logout successful', [
-                'student_id' => $user->student_id
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Logout successful.',
-            ];
-        } catch (\Exception $e) {
-            Log::error('Logout error', [
-                'student_id' => $user->student_id,
-                'message' => $e->getMessage()
-            ]);
-
-            return [
-                'success' => false,
-                'message' => 'An error occurred during logout.',
-            ];
-        }
-    }
-
-    /**
-     * Revoke all tokens (logout from all devices)
-     */
-    public function logoutAllDevices(User $user): array
-    {
-        try {
-            // Revoke all tokens for this user
-            $user->tokens()->delete();
-
-            Log::info('All devices logout successful', [
-                'student_id' => $user->student_id
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Logged out from all devices successfully.',
-            ];
-        } catch (\Exception $e) {
-            Log::error('Logout all devices error', [
-                'student_id' => $user->student_id,
-                'message' => $e->getMessage()
-            ]);
-
-            return [
-                'success' => false,
-                'message' => 'An error occurred during logout.',
-            ];
-        }
-    }
-
-    /**
-     * Get user by student ID
-     */
-    public function getUserByStudentId(string $studentId): ?User
-    {
-        return User::where('student_id', $studentId)->first();
-    }
-
-    /**
-     * Check if student is eligible for borrowing
-     * (Status is active, etc.)
-     */
-    public function isEligibleForBorrowing(User $user): bool
-    {
-        return $user->status === 'active';
-    }
-
-    /**
-     * Block/Unblock student account
-     */
-    public function updateMembershipStatus(User $user, string $status): array
-    {
-        $validStatuses = ['active', 'inactive', 'blocked', 'suspended'];
-
-        if (!in_array($status, $validStatuses)) {
-            return [
-                'success' => false,
-                'message' => "Invalid status. Allowed: " . implode(', ', $validStatuses),
-            ];
-        }
-
-        try {
-            $user->update(['status' => $status]);
-
-            Log::info('Student status updated', [
-                'student_id' => $user->student_id,
-                'new_status' => $status
-            ]);
-
-            return [
-                'success' => true,
-                'message' => "Student status updated to {$status}.",
-                'data' => [
-                    'student_id' => $user->student_id,
-                    'status' => $user->status,
-                ]
-            ];
-        } catch (\Exception $e) {
-            Log::error('Status update error', [
-                'student_id' => $user->student_id,
-                'message' => $e->getMessage()
-            ]);
-
-            return [
-                'success' => false,
-                'message' => 'An error occurred while updating status.',
-            ];
-        }
-    }
-
 }

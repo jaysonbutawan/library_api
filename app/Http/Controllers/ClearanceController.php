@@ -3,40 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\BorrowTransaction;
-use App\Models\Fine;
+use App\Http\Services\ClearanceService;
+use Illuminate\Http\Request;
 
 class ClearanceController extends Controller
 {
-    public function check($id)
+     private ClearanceService $service;
+
+    public function __construct(ClearanceService $service)
     {
-        $member = User::find($id);
+        $this->service = $service;
+    }
 
-        if (!$member) {
-            return response()->json([
-                'message' => 'Library member not found'
-            ], 404);
-        }
-
-        $activeBorrows = BorrowTransaction::where('id', $member->id)
-            ->whereIn('status', ['borrowed', 'overdue'])
-            ->count();
-
-        $unpaidFines = Fine::whereHas('transaction', function ($q) use ($member) {
-            $q->where('id', $member->id);
-        })
-        ->where('paid_status', 'unpaid')
-        ->sum('amount');
-
-        $isClear = $activeBorrows === 0 && $unpaidFines == 0;
-
+    /**
+     * Get all students clearance list
+     */
+    public function index(Request $request)
+    {
         return response()->json([
-            'id' => $member->id,
-            'full_name' => $member->full_name,
-            'active_borrows' => $activeBorrows,
-            'unpaid_fines' => $unpaidFines,
-            'clearance_status' => $isClear ? 'clear' : 'not clear'
+            'data' => $this->service->getStudentsClearanceList()
         ]);
     }
 }

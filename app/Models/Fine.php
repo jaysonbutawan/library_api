@@ -12,8 +12,11 @@ class Fine extends Model
 
     protected $fillable = [
         'transaction_id',
+        'user_id',
         'amount',
-        'paid_status',
+        'last_paid_at',
+        'is_fully_paid',
+        'created_at',
     ];
 
     public $timestamps = false;
@@ -21,5 +24,9 @@ class Fine extends Model
     public function transaction()
     {
         return $this->belongsTo(BorrowTransaction::class, 'transaction_id', 'transaction_id');
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

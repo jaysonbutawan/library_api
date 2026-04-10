@@ -7,6 +7,7 @@ use App\Http\Controllers\BooksController;
 use App\Http\Controllers\ClearanceController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\StudentController;
 
 Route::prefix('library')->group(function () {
 
@@ -84,7 +85,7 @@ Route::prefix('library')->group(function () {
     });
 
     Route::prefix('students')->name('students.')->group(function () {
-        Route::get('/{id?}', [\App\Http\Controllers\StudentController::class, 'index'])->name('index');
+        Route::get('/{id?}', [StudentController::class, 'index'])->name('index');
         Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
         Route::get('/profile/stats', [AuthController::class, 'profileWithStats'])->name('profileWithStats');
         Route::patch('/profile', [AuthController::class, 'updateProfile'])->name('updateProfile');
@@ -96,11 +97,9 @@ Route::prefix('library')->group(function () {
     });
 
     Route::prefix('fines')->name('fines.')->group(function () {
-        Route::get('/choice', [FinesController::class, 'finesChoice'])->name('finesChoice');
-        Route::post('/pay/{fineId}', [FinesController::class, 'payFine'])->name('payFine');
-        Route::get('/{userId}', [FinesController::class, 'memberFines'])->name('memberFines');
-        Route::get('/unpaid', [FinesController::class, 'unpaidFines'])->name('unpaidFines');
+        Route::get('/', [FinesController::class, 'index'])->name('index');
+        Route::post('/pay', [FinesController::class, 'pay'])->name('payFine');
     });
 
-    Route::get('/clearance/{userId}', [ClearanceController::class, 'check'])->name('clearance.check');
+    Route::get('/clearance', [ClearanceController::class, 'index'])->name('clearance.index');
 });

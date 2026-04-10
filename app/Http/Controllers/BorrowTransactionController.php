@@ -299,29 +299,4 @@ public function returnBook(Request $request, $transaction_id)
         }
     }
 
-    /**
-     * Pay fine for overdue book
-     * POST /api/borrow-transactions/{transactionId}/pay-fine
-     */
-    public function payFine($transactionId)
-    {
-        try {
-            $result = $this->service->payFine($transactionId);
-
-            return response()->json([
-                'message' => $result['message'],
-                'data' => [
-                    'transaction_id' => $result['transaction_id'],
-                    'fine_amount' => $result['fine_amount'],
-                    'fine_paid' => $result['fine_paid'],
-                ]
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['message' => $e->getMessage()], 404);
-        } catch (ValidationException $e) {
-            return response()->json(['errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 500);
-        }
-    }
 }

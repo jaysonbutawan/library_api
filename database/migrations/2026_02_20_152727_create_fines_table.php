@@ -15,13 +15,13 @@ return new class extends Migration
                 ->constrained('borrow_transactions', 'transaction_id')
                 ->cascadeOnDelete();
 
-             $table->foreignId('user_id')
-               ->constrained('users', 'id')
-                 ->cascadeOnDelete();
+            $table->foreignId('user_id')
+                ->constrained('users', 'id')
+                ->cascadeOnDelete();
 
-            $table->decimal('amount', 10, 2); // calculated fine
-            $table->enum('paid_status', ['paid', 'unpaid'])->default('unpaid');
-
+            $table->decimal('amount', 10, 2);
+            $table->timestamp('last_paid_at')->nullable();
+            $table->boolean('is_fully_paid')->default(false);
             $table->timestamp('created_at')->useCurrent();
         });
     }

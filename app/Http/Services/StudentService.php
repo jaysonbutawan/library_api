@@ -9,17 +9,17 @@ class StudentService
     public function getStudents(?int $id = null, int $perPage = 10)
     {
         $query = User::whereHas('role', function ($q) {
-                $q->whereRaw('LOWER(name) = ?', ['student']);
-            })
+            $q->where('name', 'student');
+        })
             ->withCount([
                 'borrowTransactions as total_borrowed',
                 'borrowTransactions as current_books' => function ($q) {
                     $q->where('status', 'borrowed');
                 },
             ])
-            ->with(['fines' => function ($q) {
-                $q->where('paid_status', 'unpaid');
-            }]);
+           ->withSum(['fines' => function ($q) {
+            $q->where('is_fully_paid', false);
+        }], 'amount');
 
         // =========================
         // 🔍 SEARCH FILTER
@@ -49,20 +49,20 @@ class StudentService
             if ($status === 'fines') {
                 // students WITH unpaid fines
                 $query->whereHas('fines', function ($q) {
-                    $q->where('paid_status', 'unpaid');
+                    $q->where('is_fully_paid', false);
                 });
             }
 
             if ($status === 'clear') {
                 // students WITHOUT unpaid fines
                 $query->whereDoesntHave('fines', function ($q) {
-                    $q->where('paid_status', 'unpaid');
+                    $q->where('is_fully_paid', false);
                 });
             }
         }
 
-        // ⚠️ REQUIRED for cursor pagination
-        $query->orderBy('id');
+        //REQUIRED for cursor pagination
+        $query->orderBy('users.id');
 
         // =========================
         // SINGLE STUDENT
@@ -89,18 +89,18 @@ class StudentService
         ];
     }
 
-    private function formatStudent(User $student): array
-    {
-        return [
-            'id' => $student->id,
-            'full_name' => $student->full_name,
-            'student_id' => $student->student_id,
-            'department' => $student->department,
-            'total_borrowed' => $student->total_borrowed,
-            'current_books' => $student->current_books,
+ private function formatStudent(User $student): array
+{
+    return [
+        'id' => $student->id,
+        'full_name' => $student->full_name,
+        'student_id' => $student->student_id,
+        'department' => $student->department,
+        'total_borrowed' => $student->total_borrowed ?? 0,
+        'current_books' => $student->current_books ?? 0,
 
-            // 🔥 IMPORTANT: normalize fines
-            'fines' => $student->fines->sum('amount'), // always >= 0
-        ];
-    }
+        // Use the attribute created by withSum (default to 0 if null)
+        'fines' => (float) ($student->fines_sum_amount ?? 0),
+    ];
+}
 }
