@@ -32,7 +32,7 @@ class StaffAuthService
 
         // 4. Role Check using your Model Helpers
         // This is safer than manual in_array checks
-        if (!$user->isLibrarian() && !$user->isAssistant()) {
+        if (!$user->isLibrarian() && !$user->isAssistant() && !$user->isAdmin()) {
             return [
                 'success' => false,
                 'message' => 'Unauthorized account type. Access restricted to staff.',

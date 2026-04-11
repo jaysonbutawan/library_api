@@ -62,9 +62,14 @@ class User extends Authenticatable
         return $this->role->name === 'librarian';
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role->name === 'admin';
+    }
+
     public function isAssistant(): bool
     {
-        return $this->role->name === 'assistant';
+        return $this->role->name === 'staff';
     }
 
     public function isActive(): bool
