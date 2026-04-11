@@ -1,0 +1,58 @@
+services:
+  #The Web Server (Nginx) - Handles SSL and Static Files
+  nginx:
+    image: nginx:alpine
+    container_name: library-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./public:/var/www/public
+      - ./docker/ssl:/etc/nginx/ssl:ro
+    networks:
+      - library-network
+    depends_on:
+      - app
+
+  #he Laravel Application (PHP 8.5 FPM)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: library-app
+    restart: unless-stopped
+    working_dir: /var/www
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    volumes:
+      # Keep storage persistent so logs/uploads aren't lost on restart
+      - ./storage:/var/www/storage
+    networks:
+      - library-network
+    depends_on:
+      - db
+
+  # The Database (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: library-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - library-network
+
+networks:
+  library-network:
+    driver: bridge
+
+volumes:
+  db-data:

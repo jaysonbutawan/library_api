@@ -1,0 +1,51 @@
+# --- Stage 1: Node.js (Build Assets) ---
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# --- Stage 2: PHP & Application ---
+FROM php:8.5-fpm-alpine
+
+# Install System Dependencies
+RUN apk add --no-cache \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    git \
+    curl \
+    oniguruma-dev \
+    postgresql-dev \
+    $PHPIZE_DEPS
+
+# Install PHP Extensions required by Laravel 12
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql mbstring zip exif pcntl gd
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set Working Directory
+WORKDIR /var/www
+
+# Copy Application code
+COPY . .
+
+# Copy built assets from Stage 1 (Vite/Build files)
+COPY --from=assets /app/public/build ./public/build
+
+# Install PHP Dependencies
+RUN composer install --no-interaction --optimize-autoloader --no-dev
+
+# Set Permissions
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+
+# Expose port
+EXPOSE 9000
+
+CMD ["php-fpm"]

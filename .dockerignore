@@ -1,0 +1,36 @@
+# Source Control
+.git
+.gitignore
+
+# Laravel Secrets & Config
+.env
+.env.backup
+.env.production
+auth.json
+
+# Dependencies (Docker will install these itself)
+node_modules/
+vendor/
+
+# Build Assets
+public/storage
+public/build
+storage/*.key
+
+# Laravel Logs and Cache
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
