@@ -133,17 +133,17 @@ class StudentAuthService
             'success' => true,
             'message' => 'Login successful.',
             'token'   => $token,
-             'user' => $user->load('role'), 
+             'user' => $user->load('role'),
 
-            // 'user' => [
-            //     'id'            => $user->id,
-            //     'student_id'    => $user->student_id,
-            //     'full_name'     => $user->full_name,
-            //     'email'         => $user->email,
-            //     'department'    => $user->department,
-            //     'status'        => $user->status,
-            //     'registered_at' => $user->registered_at,
-            // ],
+            'user' => [
+                'id'            => $user->id,
+                'student_id'    => $user->student_id,
+                'full_name'     => $user->full_name,
+                'email'         => $user->email,
+                'department'    => $user->department,
+                'status'        => $user->status,
+                'registered_at' => $user->registered_at,
+            ],
 
             // FULL raw API response
             'admission_response' => $data,
