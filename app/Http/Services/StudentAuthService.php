@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
+
 class StudentAuthService
 {
     protected string $admissionApiUrl;
@@ -133,8 +134,6 @@ class StudentAuthService
             'success' => true,
             'message' => 'Login successful.',
             'token'   => $token,
-             'user' => $user->load('role'),
-
             'user' => [
                 'id'            => $user->id,
                 'student_id'    => $user->student_id,
@@ -143,6 +142,9 @@ class StudentAuthService
                 'department'    => $user->department,
                 'status'        => $user->status,
                 'registered_at' => $user->registered_at,
+                'role' => [
+                    'name' => $user->role->name
+                ]
             ],
 
             // FULL raw API response
@@ -171,9 +173,13 @@ class StudentAuthService
                 ];
             }
 
-            // Delete ONLY current token
-            $user->currentAccessToken()->delete;
+            /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+            $token = $user->currentAccessToken();
 
+            // The editor will now see the 'delete' method on $token
+            if ($token) {
+                $token->delete();
+            }
             return [
                 'success' => true,
                 'message' => 'Logged out successfully.',
