@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Auth;
-
 class StudentAuthService
 {
     protected string $admissionApiUrl;
@@ -23,14 +22,9 @@ class StudentAuthService
         }
 
         $this->admissionApiUrl = $url;
-
-        if ($isTest) {
-            $this->admissionApiUrl = 'http://fake-local-url';
-        }
     }
     public function login(array $credentials): array
     {
-        // ─── 1. Call Admission API ─────────────────────────────────────────────
         try {
             $response = Http::acceptJson()
                 ->asJson()
@@ -51,7 +45,6 @@ class StudentAuthService
             ];
         }
 
-        // ─── 2. Invalid credentials ────────────────────────────────────────────
         if (in_array($response->status(), [401, 422])) {
             return [
                 'success'     => false,
@@ -60,7 +53,6 @@ class StudentAuthService
             ];
         }
 
-        // ─── 3. Other API errors ───────────────────────────────────────────────
         if (!$response->successful()) {
             Log::error('Admission API error', [
                 'status'   => $response->status(),
@@ -74,7 +66,6 @@ class StudentAuthService
             ];
         }
 
-        // ─── 4. Parse Response ─────────────────────────────────────────────────
         $data = $response->json();
 
         $student = $data['Student'] ?? null;
@@ -88,7 +79,6 @@ class StudentAuthService
             ];
         }
 
-        // ─── 5. Extract Fields ─────────────────────────────────────────────────
         $studentId = $student['student_info']['student_number']
             ?? ('EXT-' . $student['user_id']);
 
@@ -105,8 +95,8 @@ class StudentAuthService
         };
         $admissionToken = $data['token'] ?? null;
 
-        // ─── 6. Sync to Local DB ───────────────────────────────────────────────
         try {
+
             $user = User::updateOrCreate(
                 ['student_id' => $studentId],
                 [
@@ -132,7 +122,6 @@ class StudentAuthService
             ];
         }
 
-        // ─── 7. Generate Local Token ───────────────────────────────────────────
         $token = $user->createToken('library-token')->plainTextToken;
 
         Log::info('Student login success', [
@@ -140,21 +129,21 @@ class StudentAuthService
             'email'      => $email,
         ]);
 
-        // ─── 8. Return Response ────────────────────────────────────────────────
         return [
             'success' => true,
             'message' => 'Login successful.',
             'token'   => $token,
+             'user' => $user->load('role'), 
 
-            'user' => [
-                'id'            => $user->id,
-                'student_id'    => $user->student_id,
-                'full_name'     => $user->full_name,
-                'email'         => $user->email,
-                'department'    => $user->department,
-                'status'        => $user->status,
-                'registered_at' => $user->registered_at,
-            ],
+            // 'user' => [
+            //     'id'            => $user->id,
+            //     'student_id'    => $user->student_id,
+            //     'full_name'     => $user->full_name,
+            //     'email'         => $user->email,
+            //     'department'    => $user->department,
+            //     'status'        => $user->status,
+            //     'registered_at' => $user->registered_at,
+            // ],
 
             // FULL raw API response
             'admission_response' => $data,

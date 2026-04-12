@@ -93,11 +93,5 @@ Route::prefix('library')->group(function () {
         });
 
         Route::get('/clearance', [ClearanceController::class, 'index'])->name('clearance.index');
-        Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
-            return response()->json([
-                'valid' => true,
-                'user' => $request->user()
-            ]);
-        });
     });
 });
