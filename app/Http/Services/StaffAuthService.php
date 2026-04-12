@@ -4,6 +4,7 @@ namespace App\Http\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\Request;
 
 class StaffAuthService
 {
@@ -65,6 +66,54 @@ class StaffAuthService
             'success' => true,
             'user' => $user->load('role'), // Ensure role name is sent to Angular
             'token' => $token,
+        ];
+    }
+
+    public function changePassword(User $user, array $data): array
+    {
+        $currentPassword = (string) ($data['current_password'] ?? '');
+        $newPassword = (string) ($data['new_password'] ?? '');
+        $confirmPassword = (string) ($data['new_password_confirmation'] ?? '');
+
+        // 1. Validate inputs
+        if (!$currentPassword || !$newPassword) {
+            return [
+                'success' => false,
+                'message' => 'All fields are required.',
+            ];
+        }
+
+        // 2. Check current password
+        if (!Hash::check($currentPassword, $user->password)) {
+            return [
+                'success' => false,
+                'message' => 'Current password is incorrect.',
+            ];
+        }
+
+        // 3. Confirm password match
+        if ($newPassword !== $confirmPassword) {
+            return [
+                'success' => false,
+                'message' => 'New password does not match confirmation.',
+            ];
+        }
+
+        // 4. Prevent reuse
+        if (Hash::check($newPassword, $user->password)) {
+            return [
+                'success' => false,
+                'message' => 'New password must be different from current password.',
+            ];
+        }
+
+        // 5. Update password
+        $user->password = Hash::make($newPassword);
+        $user->save();
+
+        return [
+            'success' => true,
+            'message' => 'Password changed successfully.',
         ];
     }
 }

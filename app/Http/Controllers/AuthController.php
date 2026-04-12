@@ -9,14 +9,14 @@ use App\Http\Services\StudentAuthService;
 use App\Http\Services\TestStudentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
-    public function testLogin()
+    protected $staffAuthService;
+    public function __construct(StaffAuthService $staffAuthService)
     {
-        // ✅ Instantiate without parameter
-        $service = new TestStudentService();
-        return response()->json($service->testLogin());
+        $this->staffAuthService = $staffAuthService;
     }
 
 
@@ -55,24 +55,6 @@ class AuthController extends Controller
         ], $statusCode);
     }
 
-    public function logout(): JsonResponse
-    {
-        $user = auth()->user;
-
-        if ($user) {
-            $user->currentAccessToken()->delete();
-
-            Log::info('User logged out', [
-                'user_id' => $user->id,
-            ]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully.',
-        ]);
-    }
-
     public function me(): JsonResponse
     {
         $user = auth()->user->load('role');
@@ -81,5 +63,20 @@ class AuthController extends Controller
             'success' => true,
             'data'    => $user,
         ]);
+    }
+
+    public function logout(Request $request, StudentAuthService $service)
+    {
+        return response()->json($service->logout());
+    }
+    
+    public function changePassword(Request $request)
+    {
+        return response()->json(
+            $this->staffAuthService->changePassword(
+                $request->user(),
+                $request->all()
+            )
+        );
     }
 }

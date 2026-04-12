@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Auth;
 
 class StudentAuthService
 {
@@ -166,5 +167,37 @@ class StudentAuthService
                 'student_info'    => $student['student_info'] ?? null,
             ],
         ];
+    }
+
+    public function logout(): array
+    {
+        try {
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'message' => 'User not authenticated.',
+                ];
+            }
+
+            // Delete ONLY current token
+            $user->currentAccessToken()->delete;
+
+            return [
+                'success' => true,
+                'message' => 'Logged out successfully.',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Logout failed', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Logout failed.',
+            ];
+        }
     }
 }
