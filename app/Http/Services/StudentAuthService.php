@@ -101,14 +101,14 @@ class StudentAuthService
             $user = User::updateOrCreate(
                 ['student_id' => $studentId],
                 [
-                    'full_name'     => $fullName,
-                    'email'         => $email,
-                    'department'    => $student['course']['department'] ?? null,
-                    'status'        => $status,
-                    'role_id'          => 3,
-                    'password'      => null,
+                    'full_name'  => $fullName,
+                    'email'      => $email,
+                    'department' => $student['course']['department'] ?? null,
+                    'status'     => $status,
+                    'role_id'    => 3,
+                    'password'   => null,
                     'registered_at' => now(),
-                    'admission_token' => $admissionToken,
+                    'last_login' => now(),
                 ]
             );
         } catch (\Exception $e) {
