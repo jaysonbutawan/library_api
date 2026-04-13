@@ -93,6 +93,6 @@ Route::prefix('library')->group(function () {
         });
 
         Route::get('/clearance', [ClearanceController::class, 'index'])->name('clearance.index');
-        Route::get('/students/fines', [FinesController::class, 'index'])->name('index');
+        Route::get('/students/{student_id}/fines', [FinesController::class, 'index'])->name('fines.index');
     });
 });
