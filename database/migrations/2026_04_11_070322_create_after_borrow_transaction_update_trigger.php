@@ -17,31 +17,26 @@ return new class extends Migration
             AFTER UPDATE ON borrow_transactions
             FOR EACH ROW
             BEGIN
-                DECLARE existing_total DECIMAL(10,2);
-
-                IF NEW.fine_amount > 0 AND NEW.status = 'overdue' THEN
-
-                    SELECT IFNULL(SUM(amount), 0)
-                    INTO existing_total
-                    FROM fines
-                    WHERE user_id = NEW.user_id
-                    AND paid_status = 'unpaid';
-
+                -- Fire only when a fine is first assigned (fine_amount goes from 0/null to > 0)
+                -- and the book has been returned (return_date is set)
+                IF NEW.fine_amount > 0
+                    AND NEW.return_date IS NOT NULL
+                    AND (OLD.fine_amount IS NULL OR OLD.fine_amount = 0)
+                THEN
                     INSERT INTO fines(
                         user_id,
                         transaction_id,
                         amount,
-                        paid_status,
+                        is_fully_paid,
                         created_at
                     )
                     VALUES (
                         NEW.user_id,
                         NEW.transaction_id,
-                        existing_total + NEW.fine_amount,
-                        'unpaid',
+                        NEW.fine_amount,
+                        false,
                         NOW()
                     );
-
                 END IF;
             END
         ");
