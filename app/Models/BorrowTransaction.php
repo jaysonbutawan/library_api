@@ -163,7 +163,7 @@ public function completeReturn(?Carbon $returnDate = null, int $finePerDay = 0):
 
     $this->update([
         'return_date' => $returnDate->toDateString(),
-        'status' => $isOverdue ? 'overdue' : 'returned',
+        'status' => 'returned',
         'days_overdue' => $daysOverdue,
         'fine_amount' => $isOverdue ? $daysOverdue * $finePerDay : null,
     ]);

@@ -300,7 +300,7 @@ class BorrowTransactionService
         $transaction = BorrowTransaction::with(['book', 'user', 'request'])
             ->findOrFail($transaction_id);
 
-        if ($transaction->status !== 'borrowed') {
+        if (!in_array($transaction->status, ['borrowed', 'overdue'])) {
             throw ValidationException::withMessages([
                 'status' => ['This book has already been returned.']
             ]);

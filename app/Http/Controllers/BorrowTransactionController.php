@@ -136,19 +136,27 @@ class BorrowTransactionController extends Controller
      */
 public function returnBook(Request $request, $transaction_id)
 {
-    $validated = $request->validate([
-        'fine_per_day' => 'nullable|numeric|min:0',
-    ]);
+    try {
+        $validated = $request->validate([
+            'fine_per_day' => 'nullable|numeric|min:0',
+        ]);
 
-    $result = $this->service->returnBook($transaction_id, $validated);
+        $result = $this->service->returnBook($transaction_id, $validated);
 
-    return response()->json([
-        'success' => true,
-        'data' => $result,
-        'message' => $result['requires_payment']
-            ? "Book returned with fine."
-            : "Book returned successfully."
-    ]);
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+            'message' => $result['requires_payment']
+                ? "Book returned with fine."
+                : "Book returned successfully."
+        ]);
+    } catch (ModelNotFoundException $e) {
+        return response()->json(['message' => 'Transaction not found.'], 404);
+    } catch (ValidationException $e) {
+        return response()->json(['errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        return response()->json(['message' => $e->getMessage()], 500);
+    }
 }
 
     /**
