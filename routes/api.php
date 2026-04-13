@@ -93,5 +93,6 @@ Route::prefix('library')->group(function () {
         });
 
         Route::get('/clearance', [ClearanceController::class, 'index'])->name('clearance.index');
+        Route::get('/fines', [FinesController::class, 'index'])->name('index');
     });
 });
