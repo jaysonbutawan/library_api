@@ -89,8 +89,8 @@ Route::prefix('library')->group(function () {
         });
 
         Route::prefix('students')->name('students.')->group(function () {
-            Route::get('/{id?}', [StudentController::class, 'index'])->name('index');
             Route::get('/fines', [FinesController::class, 'index'])->name('fines.index');
+            Route::get('/{id?}', [StudentController::class, 'index'])->name('index');
         });
 
         Route::get('/clearance', [ClearanceController::class, 'index'])->name('clearance.index');
