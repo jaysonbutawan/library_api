@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class ClearanceController extends Controller
 {
-     private ClearanceService $service;
+    private ClearanceService $service;
 
     public function __construct(ClearanceService $service)
     {
@@ -21,7 +21,9 @@ class ClearanceController extends Controller
     public function index(Request $request)
     {
         return response()->json([
-            'data' => $this->service->getStudentsClearanceList()
+            'data' => $this->service->getStudentsClearanceList(
+                $request->student_id // ✅ pass query param
+            )
         ]);
     }
 }
