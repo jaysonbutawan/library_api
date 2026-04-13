@@ -26,6 +26,7 @@ class StudentAuthService
     }
     public function login(array $credentials): array
     {
+        // ── 1. Hit the Admission API ──────────────────────────────────────────
         try {
             $response = Http::acceptJson()
                 ->asJson()
@@ -46,6 +47,7 @@ class StudentAuthService
             ];
         }
 
+        // ── 2. Handle HTTP error responses ────────────────────────────────────
         if (in_array($response->status(), [401, 422])) {
             return [
                 'success'     => false,
@@ -67,12 +69,13 @@ class StudentAuthService
             ];
         }
 
-        $data = $response->json();
-
-        $student = $data['Student'] ?? null;
+        // ── 3. Parse response data ────────────────────────────────────────────
+        $data      = $response->json();
+        $student   = $data['Student']   ?? null;
+        $applicant = $data['applicant'] ?? null;
 
         if (!$student) {
-            Log::error('Student data missing', $data);
+            Log::error('Student data missing from admission response', $data);
 
             return [
                 'success' => false,
@@ -80,61 +83,69 @@ class StudentAuthService
             ];
         }
 
-        $studentId = $student['student_info']['student_number']
-            ?? ('EXT-' . $student['user_id']);
+        // ── 4. Extract fields from the actual response structure ──────────────
+        $studentNumber = $student['student_info']['student_number']
+            ?? ('EXT-' . ($student['user_id'] ?? uniqid()));
 
         $fullName = $student['full_name']
-            ?? $data['user']['name']
-            ?? 'Unknown';
+            ?? trim(($applicant['first_name'] ?? '') . ' ' . ($applicant['last_name'] ?? ''))
+            ?: 'Unknown';
 
-        $email = $student['email'] ?? null;
+        $email      = $student['email']      ?? $applicant['email']     ?? null;
+        $department = $student['course']['department']                   ?? null;
+        $courseId   = $student['course_id']  ?? $applicant['course_id'] ?? null;
 
-        $status = match ($student['status'] ?? 'active') {
+        $status = match ($student['status'] ?? 'inactive') {
             'approved' => 'active',
             'blocked'  => 'blocked',
             default    => 'inactive',
         };
+
         $admissionToken = $data['token'] ?? null;
 
+        // ── 5. Sync user to local DB ──────────────────────────────────────────
         try {
-
             $user = User::updateOrCreate(
-                ['student_id' => $studentId],
+                ['student_id' => $studentNumber],
                 [
-                    'full_name'  => $fullName,
-                    'email'      => $email,
-                    'department' => $student['course']['department'] ?? null,
-                    'status'     => $status,
-                    'role_id'    => 3,
-                    'password'   => null,
+                    'full_name'     => $fullName,
+                    'email'         => $email,
+                    'department'    => $department,
+                    'status'        => $status,
+                    'role_id'       => 3,
+                    'password'      => null,
                     'registered_at' => now(),
-                    'last_login' => now(),
+                    'last_login'    => now(),
                 ]
             );
         } catch (\Exception $e) {
             Log::error('DB sync failed', [
-                'student_id' => $studentId,
+                'student_id' => $studentNumber,
+                'email'      => $email,
                 'message'    => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Login succeeded but failed to save user.',
+                'debug'   => $e->getMessage(), // remove in production
             ];
         }
 
+        // ── 6. Issue local API token ──────────────────────────────────────────
         $token = $user->createToken('library-token')->plainTextToken;
 
         Log::info('Student login success', [
-            'student_id' => $studentId,
+            'student_id' => $studentNumber,
             'email'      => $email,
         ]);
 
+        // ── 7. Return response ────────────────────────────────────────────────
         return [
             'success' => true,
             'message' => 'Login successful.',
             'token'   => $token,
-            'user' => [
+            'user'    => [
                 'id'            => $user->id,
                 'student_id'    => $user->student_id,
                 'full_name'     => $user->full_name,
@@ -142,20 +153,15 @@ class StudentAuthService
                 'department'    => $user->department,
                 'status'        => $user->status,
                 'registered_at' => $user->registered_at,
-                'role' => [
-                    'name' => $user->role->name
-                ]
+                'role'          => [
+                    'name' => $user->role->name,
+                ],
             ],
-
-            // FULL raw API response
-            'admission_response' => $data,
-
-            // extracted parts (optional convenience)
             'external' => [
                 'admission_token' => $admissionToken,
-                'course_id'       => $student['course_id'] ?? null,
-                'course'          => $student['course'] ?? null,
-                'student_info'    => $student['student_info'] ?? null,
+                'course_id'       => $courseId,
+                'course'          => $student['course']        ?? null,
+                'student_info'    => $student['student_info']  ?? null,
             ],
         ];
     }
