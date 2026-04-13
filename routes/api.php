@@ -22,8 +22,8 @@ Route::prefix('library')->group(function () {
             Route::post('/change-password', [AuthController::class, 'changePassword']);
         });
     });
-    Route::middleware('api.key')->get('/clearance/{student_id}', [ClearanceController::class, 'show'])->name('clearance.show');
-    Route::middleware('api.key')->prefix('fines')->name('fines.')->group(function () {
+    Route::middleware('api.key', 'throttle:60,1')->get('/clearance/{student_id}', [ClearanceController::class, 'show'])->name('clearance.show');
+    Route::middleware('api.key', 'throttle:60,1')->prefix('fines')->name('fines.')->group(function () {
         Route::get('/', [FinesController::class, 'index'])->name('index');
         Route::post('/pay', [FinesController::class, 'pay'])->name('payFine');
     });

@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\ApiKey;
+use Illuminate\Support\Facades\Log; 
 
 class VerifyApiKey
 {
@@ -33,6 +34,14 @@ class VerifyApiKey
     if (!$key) {
         return response()->json(['message' => 'Invalid or expired API key'], 401);
     }
+
+    Log::info('API Key Used', [
+        'key_name' => $key->name,
+        'endpoint' => $request->path(),
+        'method' => $request->method(),
+        'ip' => $request->ip(),
+        'time' => now(),
+    ]);
 
     return $next($request);
 }
