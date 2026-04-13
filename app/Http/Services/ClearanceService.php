@@ -54,4 +54,32 @@ class ClearanceService
 
         return 'Cleared';
     }
+
+      public function getStudentsClearance(?string $studentId = null)
+    {
+        $query = User::query()
+            ->whereNotNull('student_id')
+            ->withSum('fines as total_fines', 'amount')
+            ->withCount([
+                'borrowTransactions as unreturned_books_count' => function ($query) {
+                    $query->whereNull('return_date');
+                }
+            ]);
+
+        //OPTIONAL FILTER (this is the only addition)
+        if ($studentId) {
+            $query->where('student_id', $studentId);
+        }
+
+        $students = $query->get();
+
+        return $students->map(function ($student) {
+            return [
+                'student_id' => $student->student_id,
+                'full_name' => $student->full_name,
+                'department' => $student->department,
+                'remarks' => $this->getRemarks($student->total_fines, $student->unreturned_books_count),
+            ];
+        });
+    }
 }

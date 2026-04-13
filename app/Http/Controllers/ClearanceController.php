@@ -22,7 +22,17 @@ class ClearanceController extends Controller
     {
         return response()->json([
             'data' => $this->service->getStudentsClearanceList(
-                $request->student_id // ✅ pass query param
+                $request->student_id // pass query param
+            )
+        ]);
+    }
+
+
+     public function show(Request $request)
+    {
+        return response()->json([
+            'data' => $this->service->getStudentsClearance(
+                $request->student_id
             )
         ]);
     }

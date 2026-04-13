@@ -22,7 +22,7 @@ Route::prefix('library')->group(function () {
             Route::post('/change-password', [AuthController::class, 'changePassword']);
         });
     });
-    Route::get('/clearance/{student_id}', [ClearanceController::class, 'index']);
+    Route::get('/clearance/{student_id}', [ClearanceController::class, 'show'])->name('clearance.show');
     Route::prefix('fines')->name('fines.')->group(function () {
         Route::get('/', [FinesController::class, 'index'])->name('index');
         Route::post('/pay', [FinesController::class, 'pay'])->name('payFine');
