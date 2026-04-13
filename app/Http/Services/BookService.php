@@ -29,9 +29,9 @@ class BookService
     public function getBooks($id = null, int $perPage = 10)
     {
         $query = Book::with('category')
-        ->where('status', '!=', 'deleted'); 
+        ->where('status', '!=', 'deleted');
 
-        // 🔍 SEARCH
+        //SEARCH
         if ($search = request('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
