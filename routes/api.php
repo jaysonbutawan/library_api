@@ -8,7 +8,6 @@ use App\Http\Controllers\ClearanceController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\StudentController;
-use illuminate\Http\Request;
 
 Route::prefix('library')->group(function () {
 
@@ -23,7 +22,7 @@ Route::prefix('library')->group(function () {
             Route::post('/change-password', [AuthController::class, 'changePassword']);
         });
     });
-    Route::get('/clearance/{student_id}', [ClearanceController::class, 'index'])->name('clearance.index');
+    Route::get('/clearance/{student_id}', [ClearanceController::class, 'index']);
     Route::prefix('fines')->name('fines.')->group(function () {
         Route::get('/', [FinesController::class, 'index'])->name('index');
         Route::post('/pay', [FinesController::class, 'pay'])->name('payFine');
