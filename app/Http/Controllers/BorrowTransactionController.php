@@ -220,11 +220,11 @@ public function returnBook(Request $request, $transaction_id)
                     ? 'User requests retrieved.'
                     : 'All requests retrieved.',
 
-                // ✅ FLATTEN RESPONSE (VERY IMPORTANT)
+                // FLATTEN RESPONSE (VERY IMPORTANT)
                 'data' => $requests['data'],
                 'meta' => $requests['meta'],
 
-                // ✅ Correct count
+                //Correct count
                 'count' => count($requests['data']),
             ], 200);
         } catch (\Exception $e) {

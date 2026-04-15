@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('api_keys', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // e.g. cashier system
+            $table->string('name');
             $table->string('api_key')->unique();
             $table->boolean('is_active')->default(true);
             $table->timestamp('expires_at')->nullable();
